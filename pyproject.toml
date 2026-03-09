@@ -1,0 +1,21 @@
+[project]
+name = "fys4411"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+  "ipykernel>=7.2.0",
+  "jax>=0.9.1",
+  "matplotlib>=3.10.8",
+  "mystmd>=1.8.1",
+  "numba>=0.64.0",
+  "numpy>=2.4.2",
+  "optax>=0.2.7",
+]
+
+[tool.ruff]
+indent-width = 2
+
+[tool.ruff.format]
+quote-style = "double"

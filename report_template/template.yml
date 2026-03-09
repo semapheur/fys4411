@@ -1,0 +1,69 @@
+jtex: v1
+title: report_template
+description: A plain LaTex template
+version: 1.0.0
+license: CC-BY-4.0
+thumbnail: ./thumbnail.png
+authors:
+  - name: Template Author Name
+tags:
+  - paper
+parts:
+  - id: abstract
+    required: true
+    description: >
+      A good abstract will begin with a short description of the problem being
+      addressed, briefly describe the new data or analyses, then briefly states
+      the main conclusion(s) and how they are supported and uncertainties.
+doc:
+  - id: title
+    required: true
+  - id: subtitle
+    required: false
+  - id: authors
+    required: true
+  - id: bibliography
+options:
+  - id: basefont
+    type: string
+    default: 11pt
+    description: Set the base font size
+  - id: draft
+    type: boolean
+    description: Mark the document as draft
+  - id: citationstyle
+    type: string
+    default: abbrvnat
+  - id: twocolumn
+    type: boolean
+    default: false
+    description: Use two column format
+  - id: showtoc
+    type: boolean
+    default: false
+    description: Add table of contents
+files:
+  - template.tex
+packages:
+  - amsfonts
+  - amsmath
+  - amssymb
+  - authblk
+  - booktabs
+  - braket
+  - caption
+  - datetime
+  - float
+  - fontenc
+  - geometry
+  - graphicx
+  - hyperref
+  - inputenc
+  - listings
+  - lmodern
+  - mathtools
+  - natbib
+  - siunitx
+  - titlesec
+  - xcolor
+myst: v1

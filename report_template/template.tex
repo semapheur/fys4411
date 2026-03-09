@@ -1,0 +1,102 @@
+\documentclass[
+  a4paper,
+  [-options.basefont-],
+  [# if options.twocolumn #] twocolumn, [# endif #]
+  [# if options.draft #] draft, [# endif #]
+]{article}
+
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{authblk}
+\usepackage{booktabs}
+\usepackage{braket}
+\usepackage[labelfont=bf, skip=5pt, font=small]{caption}
+\usepackage{datetime}
+\usepackage{float}
+\usepackage[T1]{fontenc}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage[utf8]{inputenc}
+\usepackage{listings}
+\usepackage{lmodern}
+\usepackage{mathtools}
+\usepackage{natbib}
+\usepackage{siunitx}
+\usepackage[dvipsnames]{xcolor}
+
+[-IMPORTS-]
+
+% abbrv|acm|alpha|apalike|ieeetr|plain|siam|unsrt
+% natbib: dinat|plainnat|abbrvnat|unsrtnat|rusnat|ksfh_nat
+\bibliographystyle{[-options.citationstyle-]}
+
+%\renewenvironment{verbatim}{\begin{lstlisting}}{\end{lstlisting}}
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codepurple},
+    keywordstyle=\color{NavyBlue},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize\bfseries,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=t,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+\lstset{style=mystyle}
+
+%\titleformat{\title}[block]{}{ \bfseries \LARGE}{}{}
+%\titlespacing*{\title}{0pt}{0pt}{0pt}
+
+\setlength{\parskip}{1em}
+\setlength{\parindent}{0pt}
+
+% colors for hyperlinks
+\hypersetup{colorlinks=true, allcolors=blue}
+
+% date format
+\renewcommand{\dateseparator}{-}
+
+\title{\vspace{-2.5cm} 
+  [-doc.title-] 
+  [# if doc.subtitle #] 
+    \\[0.5em] \large [-doc.subtitle-] 
+  [# endif #]
+}
+\author{[-doc.authors|join(" \\and ", "name")-]}
+\affil{[-doc.authors|join(" \\and ", "affiliation")-]}
+\date{\yyyymmdddate\today}
+
+\begin{document}
+
+\maketitle
+
+[# if parts.abstract #]
+\rule{\textwidth}{0.5pt}
+\begin{abstract}
+  \noindent [-parts.abstract-]
+\end{abstract}
+\rule{\textwidth}{0.5pt}
+[# endif #]
+
+[# if options.showtoc #]
+\tableofcontents
+[# endif #]
+
+[-CONTENT-]
+
+[# if doc.bibliography #]
+\bibliography{[- doc.bibliography | join(", ") -]}
+[# endif #]
+
+\end{document}
