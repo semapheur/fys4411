@@ -1,3 +1,4 @@
+from collections import namedtuple
 from typing import Callable, NamedTuple
 
 import numpy as np
@@ -40,7 +41,7 @@ def metropolis_step_numba[P: NamedTuple](
   Parameters
   ----------
   wavefunction : Callable[[NDArray[np.floating], P], float]
-    Wave function used to calculate the probability amplitude.
+    Variational vave function used to calculate the probability amplitude.
   local_energy : Callable[[NDArray[np.floating], P], float]
     Local energy function used to calculate the energy.
   parameters : P
@@ -121,7 +122,7 @@ def metropolis_step_importance_numba[P: NamedTuple](
   Parameters
   ----------
   wavefunction : Callable[[NDArray[np.floating], P], float]
-    Wave function used to calculate the probability amplitude.
+    Variational wave function used to calculate the probability amplitude.
   local_energy : Callable[[NDArray[np.floating], P], float]
     Local energy function used to calculate the energy.
   drift_force : Callable[[NDArray[np.floating], P], NDArray[np.floating]]
@@ -210,6 +211,123 @@ def metropolis_step_importance_numba[P: NamedTuple](
   energy_squared /= cycles
 
   return energy, energy_squared
+
+
+@njit(fastmath=True)
+def metropolis_step_minimization_numba[P: NamedTuple](
+  wavefunction: ScalarFunction[P],
+  wavefunction_derivative: ScalarFunction[P],
+  local_energy: ScalarFunction[P],
+  drift_force: VectorFunction[P],
+  parameters: P,
+  time_step: float,
+  diffusion_coefficient: float,
+  cycles: int,
+  number_particles: int,
+  dimension: int,
+):
+  """
+  Perform a single Metropolis Monte Carlo step using Langevin dynamics. JIT-compiled using numba
+
+  Parameters
+  ----------
+  wavefunction : Callable[[NDArray[np.floating], P], float]
+    Variational wave function used to calculate the probability amplitude.
+  wavefunction_derivative : Callable[[NDArray[np.floating], P], float]
+    Wave function used to calculate the probability amplitude.
+  local_energy : Callable[[NDArray[np.floating], P], float]
+    Local energy function used to calculate the energy.
+  drift_force : Callable[[NDArray[np.floating], P], NDArray[np.floating]]
+    Drift force function used to calculate the quantum force.
+  parameters : P
+    Parameters used to evaluate the wave function and local energy.
+  time_step : float
+    Time step used in the Langevin dynamics.
+  diffusion_coefficient : float
+    Diffusion coefficient used in the Langevin dynamics.
+  cycles : int
+    Number of Monte Carlo cycles to perform.
+  number_particles : int
+    Number of particles in the system.
+  dimension : int
+    Dimension of the system.
+
+  Returns
+  -------
+  energy : float
+    Calculated energy.
+  energy_squared : float
+    Calculated energy squared.
+  """
+
+  # Preccompyte constants
+  dt_sqrt = np.sqrt(time_step)
+  dt_D = time_step * diffusion_coefficient
+
+  # Initialize positions with Gaussian noise
+  positions = np.zeros((number_particles, dimension), dtype=np.float64)
+  for i in range(number_particles):
+    for j in range(dimension):
+      positions[i, j] = np.random.randn() * dt_sqrt
+
+  # Initialize variables
+  row_store = np.empty(dimension, dtype=np.float64)
+  force_old = drift_force(positions, parameters)
+  force_new = np.empty_like(force_old)
+  wf_old = wavefunction(positions, parameters)
+
+  energy = 0.0
+  psi_delta = np.zeros(len(parameters), dtype=np.float64)
+  psi_e_derivative = np.zeros(len(parameters), dtype=np.float64)
+
+  # Perform Monte Carlo cycles
+  for _ in prange(cycles):
+    for i in range(number_particles):
+      # Store current position of particle i before proposing move
+      for j in range(dimension):
+        row_store[j] = positions[i, j]
+
+      # Propose move for particle i using Langevin dynamics
+      for j in range(dimension):
+        positions[i, j] = (
+          row_store[j] + np.random.randn() * dt_sqrt + force_old[i, j] * dt_D
+        )
+
+      wf_new = wavefunction(positions, parameters)
+      force_new = drift_force(positions, parameters)
+
+      # Calculate Green's function
+      greens_function = 0.0
+      for j in range(dimension):
+        force_sum = force_old[i, j] + force_new[i, j]
+        displacement = positions[i, j] - row_store[j]
+        greens_function += 0.5 * force_sum * (0.5 * dt_D * force_sum - displacement)
+
+      # Calculate acceptance ratio for the move
+      acceptance_ratio = np.exp(greens_function) * (wf_new / wf_old) ** 2
+
+      if np.random.rand() < acceptance_ratio:  # Accept move
+        wf_old = wf_new
+        for d in range(dimension):
+          force_old[i, d] = force_new[i, d]
+
+      else:  # Reject move
+        for d in range(dimension):
+          positions[i, d] = row_store[d]
+
+    # Calculate energy
+    energy_delta = local_energy(positions, parameters)
+    psi_derivative = wavefunction_derivative(positions, parameters)
+    energy += energy_delta
+    psi_delta += psi_derivative
+    psi_e_derivative += psi_derivative * energy_delta
+
+  energy /= cycles
+  psi_delta /= cycles
+  psi_e_derivative /= cycles
+  energy_derivative = 2 * (psi_e_derivative - psi_delta * energy)
+
+  return energy, energy_derivative
 
 
 class Metropolis[P: NamedTuple, PG: ParameterGrid]:
@@ -428,3 +546,38 @@ class Metropolis[P: NamedTuple, PG: ParameterGrid]:
       )
 
     return self._grid_search(parameter_grid, cycles, run_one)
+
+  def optimize(
+    self,
+    wavefunction: ScalarFunction[P],
+    wavefunction_derivative: ScalarFunction[P],
+    local_energy: ScalarFunction[P],
+    drift_force: VectorFunction[P],
+    parameters: P,
+    time_step: float,
+    diffusion_coefficient: float,
+    cycles: int,
+    learning_rate: float,
+    optimization_iterations: int,
+  ):
+
+    parameters_ = np.array(parameters._asdict().values())
+
+    for _ in range(optimization_iterations):
+      energy, energy_derivative = metropolis_step_minimization_numba(
+        wavefunction,
+        wavefunction_derivative,
+        local_energy,
+        drift_force,
+        parameters,
+        time_step,
+        diffusion_coefficient,
+        cycles,
+        self.number_particles,
+        self.dimension,
+      )
+
+      parameters_ -= learning_rate * energy_derivative
+      parameters = namedtuple(**zip(parameters._fields, parameters))
+
+    return energy, parameters

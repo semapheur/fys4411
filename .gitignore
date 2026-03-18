@@ -10,6 +10,9 @@ wheels/
 # Virtual environments
 .venv
 
+# Documentation
+doc/
+
 # Mystmd
 **/_build
 

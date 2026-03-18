@@ -190,7 +190,85 @@ $$
 
 ## Metropolis Algorithm
 
+The ground state energy of the bose gas correlated model can be estimated using variational Monte Carlo methods. The expectation value of the Hamiltonian $\hat{H}$, in the state $\Psi_T (\mathbf{R}, \alpha, \beta)$ is given by
+
+$$
+\begin{equation*}
+\label{equation:hamiltonian-expectation}
+\begin{split}
+  E(\alpha, \beta) :=& \braket{H}_{\Psi_T} = \frac{\braket{\Psi_T (\mathbf{R}, \alpha, \beta), \hat{H} \Psi_T (\mathbf{R}, \alpha, \beta)}}{\braket{\Psi(\mathbf{R}, \alpha, \beta), \Psi_T (\mathbf{R}, \alpha, \beta)}} \\
+  =& \frac{\int_{\R^{3N}} \Psi_T^* (\mathbf{R}, \alpha, \beta) \hat{H}\Psi_T (\mathbf{R}, \alpha, \beta) \;\d\mathbf{R}}{\int_{\R^{3N}} |\Psi_T (\mathbf{R}, \alpha, \beta)|^2 \;\d\mathbf{R}}
+\end{split}
+\end{equation*}
+$$
+
+By the Rayleigh-Ritz principle $E(\alpha, \beta) \geq E_0$, where $E_0$ is the ground-state energy. Thus, we can approximate $E_0$ by minimizing $E(\alpha, \beta)$ over the parameters $(\alpha, \beta)$.
+
+To enable Monte Carlo estimation, we expand the variational energy [](#equation:trial-wavefunction) in terms of the probability density function
+
+$$
+  P_{\alpha,\beta} (\mathbf{R}) = \frac{|\Psi_T (\mathbf{R}, \alpha, \beta)|^2}{\int_{\R^{3N}} |\Psi_T (\mathbf{R}, \alpha, \beta)|^2 \;\d\mathbf{R}}
+$$
+
+Substituting the local energy [](#equation:trial-wavefunction), the variational energy can be written as the expectation value
+
+$$
+\label{equation:variation-energy-expectation}
+  E(\alpha, \beta) = \int_{\R^{3N}} P_{\alpha,\beta} (\mathbf{R}) E_L (\mathbf{R}, \alpha, \beta) \;\d\mathbf{R}
+$$
+
+Consequently, computing $E(\alpha, \beta)$ reduces to sampling from $P_{\alpha,\beta} (\mathbf{R}) \propto |\Psi_T (\mathbf{R}, \alpha, \beta)|^2$. However, the normalization constant
+
+$$
+  Z = \int_{\R^{3N}} |\Psi_T (\mathbf{R}, \alpha,\beta)|^2 \;\d\mathbf{R}
+$$
+
+is intractable in high dimensions, making direct sampling from $P_{\alpha,\beta}$ unfeasible. To overcome this, we can employ the Metropolis-Hastings algorithm to construct a Markov chain $\set{\mathbf{R}^{(k)}}_{k\geq 0}$ whose stationary distribution is $P_{\alpha,\beta}$.
+
+Given the current state $\mathbf{R}$, we propose a move $\mathbf{R}' \sim T(\cdot|\mathbf{R})$, where $T$ is a chosen transition kernel. The proposal is accepted with probability
+
+$$
+  A(\mathbf{R},\mathbf{R}') = \min\Set{1, \frac{|\Psi_T (\mathbf{R}', \alpha,\beta)|^2 T(\mathbf{R}|\mathbf{R}')}{|\Psi_T (\mathbf{R}, \alpha, \beta)|^2 T(\mathbf{R}' |\mathbf{R})}}
+$$
+
+If the transition kernel is symmetric, i.e. $T(\mathbf{R}' | \mathbf{R}) = T(\mathbf{R}|\mathbf{R}')$, the acceptance probability simplifies to
+
+$$
+  A(\mathbf{R},\mathbf{R}') = \min\Set{1, \frac{|\Psi_T (\mathbf{R}', \alpha,\beta)|^2}{|\Psi_T (\mathbf{R}, \alpha, \beta)|^2}}
+$$
+
+Using this procedure to generate samples $\set{\mathbf{R}_k}_{k=1}^M$ \sim P_{\alpha,\beta}$, the expectation [](#equation:trial-wavefunction) approximates to the empirical mean
+
+$$
+\label{equation:energy-estimation}
+  E(\alpha, \beta) \approx \frac{1}{M} \sum{k=1}^M E_L (\mathbf{R}^{(k)}, \alpha, \beta)
+$$
+
+The Metropolis algorithm using a symmetric transition kernel can be summarized as follows:
+
+Given parameters $(\alpha, \beta)$:
+1. Initialize the configuration $\mathbf{R}^{(0)}$
+2. For $k = 0,\dots,M-1$:
+    - Propose a new configurations $\mathbf{R}' \sim T(\cdot|\mathbf{R}^{(k)})$
+    - Compute the acceptance ratio
+$$
+  A = \frac{|\Psi_T (\mathbf{R}', \alpha, \beta)|^2}{|\Psi_T (\mathbf{R}^{(k)}, \alpha, \beta)|^2}
+$$
+
+    - Accept or reject:
+
+$$
+  \mathbf{R}^{(k + 1)} = \begin{cases}
+    \mathbf{R}',\quad& \text{with probability } A, \\
+    \mathbf{R}^{(k)},\quad& \text{with probability } 1 - A
+  \end{cases}
+$$
+
+3. Estimate the energy using [](#equation:trial-wavefunction)
+
 ## Importance Sampling
+
+## Parameter Optimization
 
 # Results
 
