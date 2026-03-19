@@ -1,5 +1,6 @@
 from collections import namedtuple
 from typing import Callable, NamedTuple
+from webbrowser import get
 
 import numpy as np
 from numba import njit, prange
@@ -148,7 +149,7 @@ def metropolis_step_importance_numba[P: NamedTuple](
     Calculated energy squared.
   """
 
-  # Preccompyte constants
+  # Precompute constants
   dt_sqrt = np.sqrt(time_step)
   dt_D = time_step * diffusion_coefficient
 
@@ -184,14 +185,15 @@ def metropolis_step_importance_numba[P: NamedTuple](
       force_new = drift_force(positions, parameters)
 
       # Calculate Green's function
-      greens_function = 0.0
+      greens_exponent = 0.0
       for j in range(dimension):
         force_sum = force_old[i, j] + force_new[i, j]
-        displacement = positions[i, j] - row_store[j]
-        greens_function += 0.5 * force_sum * (0.5 * dt_D * force_sum - displacement)
+        force_diff = force_old[i, j] - force_new[i, j]
+        position_delta = positions[i, j] - row_store[j]
+        greens_exponent += 0.5 * force_sum * (0.5 * dt_D * force_diff - position_delta)
 
       # Calculate acceptance ratio for the move
-      acceptance_ratio = np.exp(greens_function) * (wf_new / wf_old) ** 2
+      acceptance_ratio = np.exp(greens_exponent) * (wf_new / wf_old) ** 2
 
       if np.random.rand() < acceptance_ratio:  # Accept move
         wf_old = wf_new
@@ -214,7 +216,7 @@ def metropolis_step_importance_numba[P: NamedTuple](
 
 
 @njit(fastmath=True)
-def metropolis_step_minimization_numba[P: NamedTuple](
+def metropolis_step_optimization_numba[P: NamedTuple](
   wavefunction: ScalarFunction[P],
   wavefunction_derivative: ScalarFunction[P],
   local_energy: ScalarFunction[P],
@@ -260,7 +262,7 @@ def metropolis_step_minimization_numba[P: NamedTuple](
     Calculated energy squared.
   """
 
-  # Preccompyte constants
+  # Precompute constants
   dt_sqrt = np.sqrt(time_step)
   dt_D = time_step * diffusion_coefficient
 
@@ -297,14 +299,15 @@ def metropolis_step_minimization_numba[P: NamedTuple](
       force_new = drift_force(positions, parameters)
 
       # Calculate Green's function
-      greens_function = 0.0
+      greens_exponent = 0.0
       for j in range(dimension):
         force_sum = force_old[i, j] + force_new[i, j]
-        displacement = positions[i, j] - row_store[j]
-        greens_function += 0.5 * force_sum * (0.5 * dt_D * force_sum - displacement)
+        force_diff = force_old[i, j] - force_new[i, j]
+        position_delta = positions[i, j] - row_store[j]
+        greens_exponent += 0.5 * force_sum * (0.5 * dt_D * force_diff - position_delta)
 
       # Calculate acceptance ratio for the move
-      acceptance_ratio = np.exp(greens_function) * (wf_new / wf_old) ** 2
+      acceptance_ratio = np.exp(greens_exponent) * (wf_new / wf_old) ** 2
 
       if np.random.rand() < acceptance_ratio:  # Accept move
         wf_old = wf_new
@@ -330,7 +333,7 @@ def metropolis_step_minimization_numba[P: NamedTuple](
   return energy, energy_derivative
 
 
-class Metropolis[P: NamedTuple, PG: ParameterGrid]:
+class Metropolis[P: NamedTuple]:
   """
   Class for performing Monte Carlo simulations using the Metropolis algorithm.
 
@@ -442,7 +445,7 @@ class Metropolis[P: NamedTuple, PG: ParameterGrid]:
       self.dimension,
     )
 
-  def _grid_search(
+  def _grid_search[PG: ParameterGrid[P]](
     self,
     parameter_grid: PG,
     cycles: int,
@@ -463,7 +466,7 @@ class Metropolis[P: NamedTuple, PG: ParameterGrid]:
       error=error,
     )
 
-  def grid_search_brute(
+  def grid_search_brute[PG: ParameterGrid[P]](
     self,
     wavefunction: ScalarFunction[P],
     local_energy: ScalarFunction[P],
@@ -498,7 +501,7 @@ class Metropolis[P: NamedTuple, PG: ParameterGrid]:
 
     return self._grid_search(parameter_grid, cycles, run_one)
 
-  def grid_search_importance(
+  def grid_search_importance[PG: ParameterGrid[P]](
     self,
     wavefunction: ScalarFunction[P],
     local_energy: ScalarFunction[P],
@@ -561,10 +564,17 @@ class Metropolis[P: NamedTuple, PG: ParameterGrid]:
     optimization_iterations: int,
   ):
 
-    parameters_ = np.array(parameters._asdict().values())
+    # Extract parameter values
+    param_fields = parameters._fields
+    param_values = np.array(
+      [getattr(parameters, field) for field in param_fields], dtype=np.float64
+    )
+
+    # Cache NamedTuple type
+    ParamType = type(parameters)
 
     for _ in range(optimization_iterations):
-      energy, energy_derivative = metropolis_step_minimization_numba(
+      energy, energy_derivative = metropolis_step_optimization_numba(
         wavefunction,
         wavefunction_derivative,
         local_energy,
@@ -577,7 +587,9 @@ class Metropolis[P: NamedTuple, PG: ParameterGrid]:
         self.dimension,
       )
 
-      parameters_ -= learning_rate * energy_derivative
-      parameters = namedtuple(**zip(parameters._fields, parameters))
+      # Gradient descent steps
+      param_values -= learning_rate * energy_derivative
+
+      parameters = ParamType(*param_values)
 
     return energy, parameters

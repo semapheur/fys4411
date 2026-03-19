@@ -16,6 +16,12 @@ def wavefunction_jax(positions: Array, params: HarmonicParams) -> Array:
   return jnp.exp(-alpha * r2)
 
 
+def wavefunction_derivative_jax(positions: Array, params: HarmonicParams) -> Array:
+  r2 = jnp.sum(positions**2)
+
+  return -r2
+
+
 def local_energy_jax(positions: Array, params: HarmonicParams) -> Array:
   alpha = params.alpha
   number_particles = positions.shape[0]

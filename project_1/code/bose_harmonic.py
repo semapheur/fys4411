@@ -27,6 +27,15 @@ def wavefunction(positions: NDArray[np.floating], params: HarmonicParams) -> flo
 
 
 @njit(fastmath=True)
+def wavefunction_derivative(
+  positions: NDArray[np.floating], params: HarmonicParams
+) -> float:
+  r2 = np.sum(positions**2)
+
+  return -r2
+
+
+@njit(fastmath=True)
 def local_energy(positions: NDArray[np.floating], params: HarmonicParams) -> float:
   alpha = params.alpha
   number_particles: int = positions.shape[0]

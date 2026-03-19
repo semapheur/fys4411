@@ -188,7 +188,7 @@ $$
 \end{equation*}
 $$
 
-## Metropolis Algorithm
+## Variational Monte Carlo Estimation
 
 The ground state energy of the bose gas correlated model can be estimated using variational Monte Carlo methods. The expectation value of the Hamiltonian $\hat{H}$, in the state $\Psi_T (\mathbf{R}, \alpha, \beta)$ is given by
 
@@ -234,8 +234,10 @@ $$
 If the transition kernel is symmetric, i.e. $T(\mathbf{R}' | \mathbf{R}) = T(\mathbf{R}|\mathbf{R}')$, the acceptance probability simplifies to
 
 $$
-  A(\mathbf{R},\mathbf{R}') = \min\Set{1, \frac{|\Psi_T (\mathbf{R}', \alpha,\beta)|^2}{|\Psi_T (\mathbf{R}, \alpha, \beta)|^2}}
+  A(\mathbf{R},\mathbf{R}') = \min\Set{1, \frac{|\Psi_T (\mathbf{R}', \alpha,\beta)|^2}{|\Psi_T (\mathbf{R}, \alpha, \beta)|^2}},
 $$
+
+This special case corresponds to the original algorithm by [](article_metropolis_etal_1953), referred to as the *Metropolis algorithm*.
 
 Using this procedure to generate samples $\set{\mathbf{R}_k}_{k=1}^M$ \sim P_{\alpha,\beta}$, the expectation [](#equation:trial-wavefunction) approximates to the empirical mean
 
@@ -268,13 +270,90 @@ $$
 
 ## Importance Sampling
 
+To improve the efficiency of the Metropolis algorithm, we can apply importance sampling using Langevin molecular dynamics. 
+A diffusion process characterized by a time-dependent probability density $P(\mathbf{R}, t)$ on $\R^{3N}$, is given by the Fokker-Planck equation
+
+$$
+\label{equation:fokker-planck}
+  \frac{\partial P}{\partial t} = D \nabla \cdot (\nabla - \mathbf{F}) P(\mathbf{R}, t)
+$$
+
+where $\mathbf{F}$ is a drift term and $D > 0$ is the diffusion coefficient. The associated Langevin stochastic equation is
+
+$$
+  \frac{\partial \mathbf{R}(t)}{\partial t} = D \mathbf{F}(\mathbf{R}(t)) + \boldsymbol{\eta}(t)
+$$
+
+where $\boldsymbol{\eta}$ a random vector driven by a Wiener process. In discretized time steps $\Delta t$, the updated position is given by
+
+$$
+  \mathbf{R}' = \mathbf{R} + D\mathbf{F}(\mathbf{R}) \Delta T + \xi \sqrt{\Delta t}
+$$
+
+where $\xi \sim \mathcal{N}(0,1)$ is a Gaussian random variable. In atomic units, the diffusion coefficient is set to $D = 1/2$ to reflect the kinetic energy term $-\frac{1}{2} \nabla^2$.
+
+The probability density $P(\mathbf{R}, t)$ is stationary if and only if $\partial P/\partial t = 0$, implying that
+
+$$
+  \nabla \cdot (\nabla - \mathbf{F}) P(\mathbf{R}, t) = 0
+$$
+
+This is satisfied if the probability current vanishes, i.e. $\nabla P - \mathbf{F}P = 0$, resulting in the drift term
+
+$$
+  \mathbf{F}(\mathbf{R}) = \frac{\nabla P(\mathbf{R})}{P(\mathbf{R})} = \nabla \ln[P(\mathbf{R})]
+$$
+
+with a probabiliy density of the form $P(\mathbf{R}) \propto |\Psi_T (\mathbf{R})|^2$, we obtain
+
+$$
+  \mathbf{F}(\mathbf{R}) = \nabla \ln[|\Psi_T (\mathbf{R})|^2] = 2 \frac{\nabla \Psi_T (\mathbf{R})}{\Psi_T (\mathbf{R})}
+$$
+
+This quantity is known as the quantum force, which is introduces a drift towards regions of the configuration space where $|\Psi_T|^2$ is large. This significantly improves sampling efficiency compared with the Metropolis algorithm, which explores the configuration space through a symmetric random walk. 
+
+The Fokker-Planck equation yields a transition kernel given by the Green's function
+
+$$
+  G(\mathbf{R}', \mathbf{R}, \Delta t) = \frac{1}{(4\pi D\Delta t)^{3N/2}} \exp\left(-\frac{[\mathbf{R}' - \mathbf{R} - D\Delta t \mathbf{F}(\mathbf{R})]^2}{4D\Delta t} \right)
+$$
+
+The acceptance probability for the Metropolis-Hastings algorithm now becomes
+
+$$
+  A(\mathbf{R}, \mathbf{R}') = \min\Set{1, \frac{G(\mathbf{R}, \mathbf{R}', \Delta t) |\Psi_T (\mathbf{R}')|^2}{G(\mathbf{R}', \mathbf{R}, \Delta t) |\Psi_T (\mathbf{R})|^2}}
+$$
+
+Introducing
+
+$$
+\begin{equation*}
+  \Delta\mathbf{R} = \mathbf{R}' - \mathbf{R},\quad \mathbf{F} = \mathbf{F}(\mathbf{R}), \quad \mathbf{F}' = \mathbf{F}(\mathbf{R}'),
+\end{equation*}
+$$
+
+the ratio of Green's functions is given by
+
+$$
+\begin{align*}
+  \frac{G(\mathbf{R}, \mathbf{R}', \Delta t)}{G(\mathbf{R}', \mathbf{R}, \Delta t)} =& \exp\left[-\frac{1}{4D\Delta t} \left( [-\Delta\mathbf{R} - D\Delta t \mathbf{F}']^2 - [\Delta\mathbf{R} - D\Delta t \mathbf{F}]^2 \right) \right] \\
+  =& \exp\left[-\frac{1}{2} \Delta \mathbf{R} \cdot (\mathbf{F}' + \mathbf{F}) - \frac{D\Delta t}{4} \left(|\mathbf{F}'|^2 - |\mathbf{F}|^2 \right) \right]
+\end{align*}
+$$
+
+Applying the identity $|\mathbf{F}'|^2 - |\mathbf{F}|^2 = (\mathbf{F}' + \mathbf{F}) \cdot (\mathbf{F}' - \mathbf{F})$, this can be refactored as
+
+$$
+  \frac{G(\mathbf{R}, \mathbf{R}', \Delta t)}{G(\mathbf{R}', \mathbf{R}, \Delta t)} = \exp\left[-\frac{1}{2} (\mathbf{F}' + \mathbf{F}) \cdot \left(\Delta\mathbf{R} + \frac{D\Delta t}{2} (\mathbf{F}' - \mathbf{F}) \right) \right],
+$$
+
 ## Parameter Optimization
 
 # Results
 
 ## Non-Interacting Case
 
-The numerical approach using finite difference derivation to evaluate the Laplacian of $\Psi_T$ requires $O(2*n*d)$ operations, since it requires calculating the wavefunction twice per coordinate, while the analytic expression scales as $O(1)$.
+The numerical approach using finite difference derivation to evaluate the Laplacian of $\Psi_T$ requires $O(2nd)$ operations, since it requires calculating the wavefunction twice per coordinate, while the analytic expression scales as $O(1)$.
 
 # Appendix
 
