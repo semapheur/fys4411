@@ -12,6 +12,7 @@ exports:
 math:
   # Note the 'single quotes'
   '\argmin': '\operatorname{argmin}'
+  \drm': '\mathrm{d}'
   '\N': '\mathbb{N}'
   '\R': '\mathbb{R}'
   '\unitvec': '{\hat{\mathbf{#1}}}'
@@ -190,14 +191,14 @@ $$
 
 ## Variational Monte Carlo Estimation
 
-The ground state energy of the bose gas correlated model can be estimated using variational Monte Carlo methods. The expectation value of the Hamiltonian $\hat{H}$, in the state $\Psi_T (\mathbf{R}, \alpha, \beta)$ is given by
+The ground state energy of the bose gas correlated model can be estimated using variational Monte Carlo methods. The expectation value of the Hamiltonian $\hat{H}$, in the state $\Psi_T (\mathbf{R}; \alpha, \beta)$ is given by
 
 $$
 \begin{equation*}
 \label{equation:hamiltonian-expectation}
 \begin{split}
-  E(\alpha, \beta) :=& \braket{H}_{\Psi_T} = \frac{\braket{\Psi_T (\mathbf{R}, \alpha, \beta), \hat{H} \Psi_T (\mathbf{R}, \alpha, \beta)}}{\braket{\Psi(\mathbf{R}, \alpha, \beta), \Psi_T (\mathbf{R}, \alpha, \beta)}} \\
-  =& \frac{\int_{\R^{3N}} \Psi_T^* (\mathbf{R}, \alpha, \beta) \hat{H}\Psi_T (\mathbf{R}, \alpha, \beta) \;\d\mathbf{R}}{\int_{\R^{3N}} |\Psi_T (\mathbf{R}, \alpha, \beta)|^2 \;\d\mathbf{R}}
+  E(\alpha, \beta) :=& \braket{H}_{\Psi_T} = \frac{\braket{\Psi_T (\mathbf{R}; \alpha, \beta), \hat{H} \Psi_T (\mathbf{R}, \alpha, \beta)}}{\braket{\Psi(\mathbf{R}, \alpha, \beta), \Psi_T (\mathbf{R}; \alpha, \beta)}} \\
+  =& \frac{\int_{\R^{3N}} \Psi_T^* (\mathbf{R}; \alpha, \beta) \hat{H}\Psi_T (\mathbf{R}; \alpha, \beta) \;\drm\mathbf{R}}{\int_{\R^{3N}} |\Psi_T (\mathbf{R}; \alpha, \beta)|^2 \;\drm\mathbf{R}}
 \end{split}
 \end{equation*}
 $$
@@ -207,14 +208,15 @@ By the Rayleigh-Ritz principle $E(\alpha, \beta) \geq E_0$, where $E_0$ is the g
 To enable Monte Carlo estimation, we expand the variational energy [](#equation:trial-wavefunction) in terms of the probability density function
 
 $$
-  P_{\alpha,\beta} (\mathbf{R}) = \frac{|\Psi_T (\mathbf{R}, \alpha, \beta)|^2}{\int_{\R^{3N}} |\Psi_T (\mathbf{R}, \alpha, \beta)|^2 \;\d\mathbf{R}}
+\label{equation:wavefunction-pdf}
+  P_{\alpha,\beta} (\mathbf{R}) = \frac{|\Psi_T (\mathbf{R}; \alpha, \beta)|^2}{\int_{\R^{3N}} |\Psi_T (\mathbf{R}; \alpha, \beta)|^2 \;\drm\mathbf{R}}
 $$
 
 Substituting the local energy [](#equation:trial-wavefunction), the variational energy can be written as the expectation value
 
 $$
 \label{equation:variation-energy-expectation}
-  E(\alpha, \beta) = \int_{\R^{3N}} P_{\alpha,\beta} (\mathbf{R}) E_L (\mathbf{R}, \alpha, \beta) \;\d\mathbf{R}
+  E(\alpha, \beta) = \int_{\R^{3N}} P_{\alpha,\beta} (\mathbf{R}) E_L (\mathbf{R}; \alpha, \beta) \;\drm\mathbf{R} = \mathbb{E}_{P_{\alpha, \beta}} (E_L)
 $$
 
 Consequently, computing $E(\alpha, \beta)$ reduces to sampling from $P_{\alpha,\beta} (\mathbf{R}) \propto |\Psi_T (\mathbf{R}, \alpha, \beta)|^2$. However, the normalization constant
@@ -348,6 +350,14 @@ $$
 $$
 
 ## Parameter Optimization
+
+The optimal variational parameters $(\alpha, \beta)$ can be obtained by minimizing the variational energy $E(\alpha, \beta)$. This a can be achieved by using the gradient $\nabla_{\alpha, \beta} E(\alpha, \beta)$ with respect to variational parameters as the objective for an optimization procedure. The energy derivatives can be written as
+
+$$
+  \frac{\partial E}{\partial\gamma} = 2 \left( \Braket{\frac{\partial_\gamma \Psi_T (\mathbf{R}; \alpha, \beta)}{\Psi_T (\mathbf{R}; \alpha, \beta)} E_L (\mathbf{R}; \alpha, \beta)} - \Braket{\frac{\partial_\gamma \Psi_T (\mathbf{R}; \alpha, \beta)}{\Psi_T (\mathbf{R}; \alpha, \beta)}} \braket{E_L (\mathbf{R}; \alpha, \beta)} \right)
+$$
+
+where $\gamma = \alpha, \beta$.
 
 # Results
 
@@ -616,4 +626,70 @@ $$
   &+ \sum_{i\neq k} \sum_{j\neq k} \frac{(\mathbf{r}_k - \mathbf{r}_i)(\mathbf{r}_k - \mathbf{r}_j)}{r_{ki} r_{kj}} u'(r_{ki}) u'(r_{kj}) \\
   &+ \sum_{j\neq k} \left(u'' (r_{kj}) + \frac{2}{r_{kj}} u' (r_{kj}) \right)
 \end{align*}
+$$
+
+## Energy Derivatives
+
+To derive the expression for the energy derivatives [](#equation:energy-derivative), we apply the quotient rule to $E(\alpha, \beta) = N/D$ defined in [](#equation:hamiltonian-expectation). This gives
+
+$$
+\label{equation:quotient-rule}
+  \frac{\partial E(\alpha, \beta)}{\partial\gamma} = \frac{(\partial_\gamma N) D - N(\partial_\gamma D)}{D^2} = \frac{(\partial_\gamma N)}{D} E(\alpha, \beta) \frac{\partial_\gamma D}{D},
+$$
+
+where $\gamma = \alpha, \beta$. The numerator partial derivative is
+
+$$
+\begin{align*}
+  \partial_\gamma N =& \frac{\partial}{\partial\gamma} \int_{\R^{3N}} \Psi(\mathbf{R}; \alpha, \beta) \hat{H}\Psi_T (\mathbf{R}; \alpha, \beta) \;\drm \mathbf{R} \\
+  =& \int [(\partial_\gamma \Psi_T) \hat{H}\Psi_T + \Psi_T \hat{H} (\partial_\gamma \Psi_T)] \;\drm\mathbf{R}
+\end{align*}
+$$
+
+Since $\hat{H}$ is Hermitian, we get
+
+$$
+  \int \Psi_T \hat{H} (\partial_\gamma \Psi_T) \;\drm\mathbf{R} = \int (\partial_\gamma \Psi_T) \hat{H} \Psi_T \;\drm\mathbf{R}
+$$
+
+Substituting the local energy $E_L$ defined in [](#equation:local-energy) results in
+
+$$
+  \partial_\gamma N = 2 \int (\partial_\gamma \Psi_T) \hat{H} \Psi_T \;\d\mathbf{R} = 2 \int |\Psi_T|^2 \left(\frac{\partial_\gamma \Psi_T}{\Psi_T} \right) E_L
+$$
+
+The denominator derivative is
+
+$$
+\begin{align*}
+  \partial_\gamma D =& \frac{\partial}{\partial\gamma} \int_{\R^{3N}} |\Psi_T (\mathbf{R}; \alpha, \beta)|^2 \;\drm\mathbf{R} \\
+  =& 2 \int \Psi_T (\partial_\gamma \Psi_T) \;\drm\mathbf{R} = 2 \int |\Psi_T|^2 \left(\frac{\partial_\gamma \Psi_T}{\Psi_T} \right)
+\end{align*}
+$$
+
+Inserting into the quotient rule [](#equation:quotient-rule) yields
+
+$$
+\begin{align*}
+  \frac{\partial E}{\partial\gamma} =& 2 \int \left(\frac{|\Psi_T|^2}{\int |\Psi_T|^2 \;\drm\mathbf{R}}\right) \left(\frac{\partial_\gamma \Psi_T}{\Psi_T} \right) E_L \;\drm\mathbf{R} \\
+  &- 2 E(\alpha, \beta) \int \left(\frac{|\Psi_T|^2}{\int |\Psi_T|^2 \;\drm \mathbf{R}} \right) \left(\frac{\partial_\gamma \Psi_T}{\Psi_T} \right) \;\drm\mathbf{R}
+\end{align*}
+$$
+
+Inserting the probability density $P_{\alpha,\beta}$ defined in [](#equation:wavefunction-pdf), we identify the expectation values
+
+$$
+  \Braket{\frac{\partial_\gamma \Psi_T}{\Psi_T} E_L} = \int P_{\alpha, \beta} (\mathbf{R}) \left(\frac{\partial_\gamma \Psi_T (\mathbf{R}; \alpha, \beta)}{\Psi_T (\mathbf{R}; \alpha, \beta)} \right) E_L (\mathbf{R}; \alpha, \beta) \;\drm\mathbf{R}
+$$
+
+and
+
+$$
+  \Braket{\frac{\partial_\gamma \Psi_T}{\Psi_T}} = \int P_{\alpha, \beta} (\mathbf{R}) \left(\frac{\partial_\gamma \Psi_T (\mathbf{R}; \alpha, \beta)}{\Psi_T (\mathbf{R}; \alpha, \beta)} \right) \;\drm\mathbf{R}
+$$
+
+Also, since $E(\alpha, \beta) = \braket{E_L}$ as defined in [](#equation:variation-energy-expectation), we finally arrive at
+
+$$
+  \frac{\partial E}{\partial\gamma} = 2\left(\Braket{\frac{\partial_\gamma \Psi_T}{\Psi_T} E_L} - \Braket{\frac{\partial_\gamma}{\Psi_T}} \braket{E_L} \right)
 $$
