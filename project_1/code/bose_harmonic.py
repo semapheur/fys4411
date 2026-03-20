@@ -27,6 +27,14 @@ def wavefunction(positions: NDArray[np.floating], params: HarmonicParams) -> flo
 
 
 @njit(fastmath=True)
+def log_wavefunction(positions: NDArray[np.floating], params: HarmonicParams) -> float:
+  alpha = params.alpha
+  r2 = np.sum(positions**2)
+
+  return -alpha * r2
+
+
+@njit(fastmath=True)
 def wavefunction_derivative(
   positions: NDArray[np.floating], params: HarmonicParams
 ) -> float:
