@@ -3,6 +3,7 @@ from typing import Callable, NamedTuple
 import numpy as np
 from numba import njit
 from numpy.typing import NDArray
+from stats import seed_numba
 from structs import ParameterGrid
 
 type ScalarFunction[P: NamedTuple] = Callable[[NDArray[np.floating], P], float]
@@ -16,12 +17,6 @@ class GridSearchResult[P: NamedTuple](NamedTuple):
   energy: NDArray[np.floating]
   variance: NDArray[np.floating]
   error: NDArray[np.floating]
-
-
-@njit
-def seed_numba(s: int):
-  """Numba helper function to seed the random number generator."""
-  np.random.seed(s)
 
 
 @njit(fastmath=True)
@@ -209,7 +204,7 @@ def metropolis_step_importance_numba[P: NamedTuple](
 
 @njit(fastmath=True)
 def metropolis_step_optimization_numba[P: NamedTuple](
-  log_wavefunction: ScalarFunction[P],
+  wavefunction: ScalarFunction[P],
   wavefunction_derivative: ScalarFunction[P],
   local_energy: ScalarFunction[P],
   drift_force: VectorFunction[P],
@@ -235,7 +230,7 @@ def metropolis_step_optimization_numba[P: NamedTuple](
   position_old = np.empty(dimension, dtype=np.float64)
   force_old = drift_force(positions, parameters)
   force_new = np.empty_like(force_old)
-  wf_old = log_wavefunction(positions, parameters)
+  wf_old = wavefunction(positions, parameters)
 
   energy = 0.0
   psi_delta = np.zeros(len(parameters), dtype=np.float64)
@@ -254,7 +249,7 @@ def metropolis_step_optimization_numba[P: NamedTuple](
           position_old[j] + np.random.randn() * dt_sqrt + force_old[i, j] * dt_D
         )
 
-      wf_new = log_wavefunction(positions, parameters)
+      wf_new = wavefunction(positions, parameters)
       force_new[:] = drift_force(positions, parameters)
 
       # Calculate Green's function
@@ -266,9 +261,9 @@ def metropolis_step_optimization_numba[P: NamedTuple](
         greens_exponent += 0.5 * force_sum * (0.5 * dt_D * force_diff + position_diff)
 
       # Calculate acceptance ratio for the move
-      log_acceptance_ratio = greens_exponent + 2 * (wf_new - wf_old)
+      acceptance_ratio = np.exp(greens_exponent) * (wf_new / wf_old) ** 2
 
-      if np.log(np.random.rand()) < log_acceptance_ratio:  # Accept move
+      if np.random.rand() < acceptance_ratio:  # Accept move
         wf_old = wf_new
         for j in range(dimension):
           force_old[i, j] = force_new[i, j]
@@ -284,9 +279,10 @@ def metropolis_step_optimization_numba[P: NamedTuple](
     psi_delta += psi_derivative
     psi_e_derivative += psi_derivative * energy_delta
 
-  energy /= cycles
-  psi_delta /= cycles
-  psi_e_derivative /= cycles
+  cycles_inv = 1.0 / cycles
+  energy *= cycles_inv
+  psi_delta *= cycles_inv
+  psi_e_derivative *= cycles_inv
   energy_gradient = 2 * (psi_e_derivative - psi_delta * energy)
 
   return energy, energy_gradient
@@ -498,8 +494,6 @@ class Metropolis[P: NamedTuple]:
       gradient_norm = np.linalg.norm(energy_gradient)
 
       if gradient_norm < gradient_tolerance:
-        print(f"Converged at {i} iterations")
-        print(f"Energy={energy:.2f}, grad={gradient_norm:.3e}, {parameters}")
         break
 
       if gradient_norm > gradient_clip:
@@ -510,9 +504,12 @@ class Metropolis[P: NamedTuple]:
 
       parameters = ParamType(*param_values)
 
-      if i % 10 == 0:
+      if (i + 1) % 10 == 0:
         print(
-          f"iteration {i}/{optimization_iterations}: E={energy:.2f}, grad={gradient_norm:.3e}, {parameters}"
+          f"iteration {i + 1}/{optimization_iterations}: E={energy:.2f}, grad={gradient_norm:.3e}, {parameters}"
         )
+
+    print(f"Finished at {i} iterations")
+    print(f"Energy={energy:.2f}, grad={gradient_norm:.3e}, {parameters}")
 
     return energy, parameters

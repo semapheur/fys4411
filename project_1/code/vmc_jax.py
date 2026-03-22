@@ -3,15 +3,16 @@ from typing import Callable, NamedTuple
 import jax.numpy as jnp
 import numpy as np
 import optax
-from jax import Array, jit, lax, random, tree_util, vmap
+from jax import Array, debug, jit, lax, random, tree, tree_util, vmap
 from numpy.typing import NDArray
 from structs import ParameterGrid
 
-type ParticleCarryBrute = tuple[Array, Array]
-type CycleCarryBrute = tuple[Array, Array, Array, Array]
-type ParticleCarryImportance = tuple[Array, Array, Array]
-type CycleCarryImportance = tuple[Array, Array, Array, Array, Array]
-type CycleCarryOptimize = tuple[Array, Array, Array, Array, Array, Array, Array]
+type CycleCarryBrute = tuple[Array, Array, Array]
+type CycleCarryImportance = tuple[Array, Array, Array, Array]
+type CycleCarryOptimize[P: NamedTuple] = tuple[Array, Array, Array, Array, P, P]
+type CarryGradientDescent[P: NamedTuple] = tuple[
+  int, P, optax.OptState, Array, Array, Array
+]
 
 
 class GridSearchResult[P: NamedTuple](NamedTuple):
@@ -81,67 +82,52 @@ class MetropolisJAX[P: NamedTuple]:
     energy_squared : float
       Calculated energy squared.
     """
-    position_initial = jnp.zeros((self.number_particles, self.dimensions))
-    wf_intial = wavefunction(position_initial, parameters)
+
+    # Initialize variables
+    position_0 = jnp.zeros((self.number_particles, self.dimensions))
+    wf_0 = wavefunction(position_0, parameters)
 
     def cycle_step(
       carry: CycleCarryBrute, carry_key: Array
-    ) -> tuple[CycleCarryBrute, None]:
-      """
-      JAX-vectorized helper function to perform a Monte Carlo cycle.
-      """
-      pos_old, wf_old, energy, energy_squared = carry
+    ) -> tuple[CycleCarryBrute, Array]:
 
-      def per_particle(
-        state: ParticleCarryBrute, i: Array
-      ) -> tuple[ParticleCarryBrute, None]:
-        """
-        JAX-vectorized helper function to perform a Metropolis Monte Carlo step for a single particle.
-        """
+      position_old, wf_old, energy = carry
 
-        pos_old, wf_old = state
+      # Split the random key
+      walk_key, accept_key = random.split(carry_key)
 
-        # Split the random key
-        particle_key = random.fold_in(carry_key, i)
-        walk_key, accept_key = random.split(particle_key)
+      # Propose new configuration
+      delta = step_size * random.normal(walk_key, (position_old.shape))
+      position_new = position_old + delta
 
-        # Walk position
-        delta = step_size * (random.uniform(walk_key, (self.dimensions,)) - 0.5)
-        pos_new = pos_old.at[i].add(delta)
+      # Calculate probability amplitude for proposed configuration
+      wf_new = wavefunction(position_new, parameters)
 
-        # Calculate acceptance ratio for the move
-        wf_new = wavefunction(pos_new, parameters)
-        acceptance_ratio = (wf_new / wf_old) ** 2
+      # Calculate acceptance ratio for the move
+      acceptance_ratio = (wf_new / wf_old) ** 2
 
-        # Update position and probability amplitude for accepted moves
-        accept = random.uniform(accept_key) < acceptance_ratio
-        pos_old = jnp.where(accept, pos_new, pos_old)
-        wf_old = jnp.where(accept, wf_new, wf_old)
+      # Update position and probability amplitude for accepted moves
+      accept = random.uniform(accept_key) < acceptance_ratio
+      position_old = jnp.where(accept, position_new, position_old)
+      wf_old = jnp.where(accept, wf_new, wf_old)
 
-        return (pos_old, wf_old), None
+      energy_delta = local_energy(position_old, parameters)
+      energy_new = energy + energy_delta
 
-      # Iterate over all particles
-      (pos_old, wf_old), _ = lax.scan(
-        per_particle, (pos_old, wf_old), jnp.arange(self.number_particles)
-      )
+      return (position_old, wf_old, energy_new), energy_new
 
-      energy_delta = local_energy(pos_old, parameters)
-      return (
-        pos_old,
-        wf_old,
-        energy + energy_delta,
-        energy_squared + energy_delta**2,
-      ), None
-
-    cycle_keys = random.split(rng_key, cycles)
-    zero = jnp.zeros(())  # Initial energy
+    # Initialize carry
+    zero_scalar = jnp.zeros(())  # Initial energy
+    carry_0 = (position_0, wf_0, zero_scalar)
 
     # Iterate over all Monte Carlo cycles
-    (_, _, energy, energy_squared), _ = lax.scan(
-      cycle_step, (position_initial, wf_intial, zero, zero), cycle_keys
-    )
+    cycle_keys = random.split(rng_key, cycles)
+    (_, _, energy), energy_accummulator = lax.scan(cycle_step, carry_0, cycle_keys)
 
-    return energy / cycles, energy_squared / cycles
+    cycle_counts = jnp.arange(1, cycles + 1)
+    energies = energy_accummulator / cycle_counts
+
+    return energy / cycles, energies
 
   @jit(static_argnums=(0, 1, 2, 3, 5, 6, 7))
   def _step_importance(
@@ -163,97 +149,80 @@ class MetropolisJAX[P: NamedTuple]:
     rng_key, init_key, cycle_key = random.split(rng_key, 3)
 
     # Initialize positions with Gaussian noise
-    position_initial = (
+    position_0 = (
       random.normal(init_key, (self.number_particles, self.dimensions)) * dt_sqrt
     )
-    wf_intial = wavefunction(position_initial, parameters)
-    force_initial = drift_force(position_initial, parameters)
+    wf_0 = wavefunction(position_0, parameters)
+    force_initial = drift_force(position_0, parameters)
 
     def cycle_step(
       carry: CycleCarryImportance, carry_key: Array
-    ) -> tuple[CycleCarryImportance, None]:
-      """
-      JAX-vectorized helper function to perform a Monte Carlo cycle.
-      """
-      pos_old, wf_old, force_old, energy, energy_squared = carry
+    ) -> tuple[CycleCarryImportance, Array]:
 
-      def per_particle(
-        state: ParticleCarryImportance, i: Array
-      ) -> tuple[ParticleCarryImportance, None]:
-        """
-        JAX-vectorized helper function to perform a Metropolis Monte Carlo step for a single particle.
-        """
+      position_old, wf_old, force_old, energy = carry
 
-        pos_old, wf_old, force_old = state
+      walk_key, accept_key = random.split(carry_key)
 
-        # Split the random key
-        particle_key = random.fold_in(carry_key, i)
-        walk_key, accept_key = random.split(particle_key)
+      # Propose new configuration
+      delta = random.normal(walk_key, (position_old.shape)) * dt_sqrt + force_old * dt_D
+      position_new = position_old + delta
 
-        # Walk position
-        delta = (
-          random.normal(walk_key, (self.dimensions,)) * dt_sqrt + force_old[i] * dt_D
-        )
-        pos_new = pos_old.at[i].add(delta)
+      # Calculate probability amplitude and quantum force for proposed configuration
+      wf_new = wavefunction(position_new, parameters)
+      force_new = drift_force(position_new, parameters)
 
-        wf_new = wavefunction(pos_new, parameters)
-        force_new = drift_force(pos_new, parameters)
+      # Calculate Green's function exponent
+      force_sum = force_old + force_new
+      force_diff = force_old - force_new
+      pos_diff = position_old - position_new
+      greens_exponent = jnp.sum(0.5 * force_sum * (0.5 * dt_D * force_diff + pos_diff))
 
-        # Calculate Green's function exponent
-        force_sum = force_old[i] + force_new[i]
-        force_diff = force_old[i] - force_new[i]
-        pos_delta = pos_new[i] - pos_old[i]
-        greens_exponent = jnp.sum(
-          0.5 * force_sum * (0.5 * dt_D * force_diff - pos_delta)
-        )
+      # Calculate acceptance ratio for the move
+      acceptance_ratio = jnp.exp(greens_exponent) * (wf_new / wf_old) ** 2
 
-        # Calculate acceptance ratio for the move
-        acceptance_ratio = jnp.exp(greens_exponent) * (wf_new / wf_old) ** 2
+      # Update position and probability amplitude for accepted moves
+      accept = random.uniform(accept_key) < acceptance_ratio
+      position_old = jnp.where(accept, position_new, position_old)
+      wf_old = jnp.where(accept, wf_new, wf_old)
+      force_old = jnp.where(accept, force_new, force_old)
 
-        # Update position and probability amplitude for accepted moves
-        accept = random.uniform(accept_key) < acceptance_ratio
-        pos_old = jnp.where(accept, pos_new, pos_old)
-        wf_old = jnp.where(accept, wf_new, wf_old)
-        force_old = jnp.where(accept, force_new, force_old)
+      energy_delta = local_energy(position_old, parameters)
+      energy_new = energy + energy_delta
 
-        return (pos_old, wf_old, force_old), None
-
-      # Iterate over all particles
-      (
-        (
-          pos_old,
-          wf_old,
-          force_old,
-        ),
-        _,
-      ) = lax.scan(
-        per_particle, (pos_old, wf_old, force_old), jnp.arange(self.number_particles)
-      )
-
-      energy_delta = local_energy(pos_old, parameters)
       return (
-        pos_old,
+        position_old,
         wf_old,
         force_old,
-        energy + energy_delta,
-        energy_squared + energy_delta**2,
-      ), None
+        energy_new,
+      ), energy_new
 
-    cycle_keys = random.split(cycle_key, cycles)
-    zero = jnp.zeros(())  # Initial energy
-
-    # Iterate over all Monte Carlo cycles
-    (_, _, _, energy, energy_squared), _ = lax.scan(
-      cycle_step, (position_initial, wf_intial, force_initial, zero, zero), cycle_keys
+    # Initalize carry for Monte Carlo cycles
+    zero_scalar = jnp.zeros(())  # Initial energy
+    carry_0 = (
+      position_0,
+      wf_0,
+      force_initial,
+      zero_scalar,
     )
 
-    return energy / cycles, energy_squared / cycles
+    # Iterate over all Monte Carlo cycles
+    cycle_keys = random.split(cycle_key, cycles)
+    (_, _, _, energy), energy_accumulator = lax.scan(
+      cycle_step,
+      carry_0,
+      cycle_keys,
+    )
+
+    cycle_counts = jnp.arange(1, cycles + 1)
+    energies = energy_accumulator / cycle_counts
+
+    return energy / cycles, energies
 
   @jit(static_argnums=(0, 1, 2, 3, 4, 6, 7, 8))
   def _step_optimization(
     self,
     wavefunction: Callable[[Array, P], Array],
-    wavefunction_derivative: Callable[[Array, P], Array],
+    wavefunction_derivative: Callable[[Array, P], P],
     local_energy: Callable[[Array, P], Array],
     drift_force: Callable[[Array, P], Array],
     parameters: P,
@@ -261,128 +230,111 @@ class MetropolisJAX[P: NamedTuple]:
     diffusion_coefficient: float,
     cycles: int,
     rng_key: Array,
-  ):
+  ) -> tuple[Array, Array]:
+
     # Precompute constants
     dt_sqrt = jnp.sqrt(time_step)
     dt_D = time_step * diffusion_coefficient
 
+    # Initialize random keys
     rng_key, init_key, cycle_key = random.split(rng_key, 3)
 
-    # Initialize positions with Gaussian noise
-    position_initial = (
+    # Initialize variables
+    position_0 = (
       random.normal(init_key, (self.number_particles, self.dimensions)) * dt_sqrt
     )
-    wf_intial = wavefunction(position_initial, parameters)
-    force_initial = drift_force(position_initial, parameters)
+    wf_0 = wavefunction(position_0, parameters)
+    force_0 = drift_force(position_0, parameters)
 
-    def cycle_step(
-      carry: CycleCarryOptimize, carry_key: Array
-    ) -> tuple[CycleCarryOptimize, None]:
-      """
-      JAX-vectorized helper function to perform a Monte Carlo cycle.
-      """
-      (
-        pos_old,
-        wf_old,
-        force_old,
-        energy,
-        energy_squared,
-        psi_delta,
-        psi_e_derivative,
-      ) = carry
+    def cycle_step(carry: CycleCarryOptimize[P], carry_key: Array):
+      position_old, wf_old, force_old, energy, psi_derivative, psi_e_derivative = carry
 
-      def per_particle(
-        state: ParticleCarryImportance, i: Array
-      ) -> tuple[ParticleCarryImportance, None]:
-        """
-        JAX-vectorized helper function to perform a Metropolis Monte Carlo step for a single particle.
-        """
+      walk_key, accept_key = random.split(carry_key)
 
-        pos_old, wf_old, force_old = state
+      # Propose new configuration
+      delta = random.normal(walk_key, position_old.shape) * dt_sqrt + force_old * dt_D
+      position_new = position_old + delta
 
-        # Split the random key
-        particle_key = random.fold_in(carry_key, i)
-        walk_key, accept_key = random.split(particle_key)
+      # Calculate probability amplitude and quantum force
+      wf_new = wavefunction(position_new, parameters)
+      force_new = drift_force(position_new, parameters)
 
-        # Walk position
-        delta = (
-          random.normal(walk_key, (self.dimensions,)) * dt_sqrt + force_old[i] * dt_D
-        )
-        pos_new = pos_old.at[i].add(delta)
+      # Calculate Green's function exponent
+      force_sum = force_old + force_new
+      force_diff = force_old - force_new
+      pos_diff = position_old - position_new
+      greens_exponent = jnp.sum(0.5 * force_sum * (0.5 * dt_D * force_diff * pos_diff))
 
-        wf_new = wavefunction(pos_new, parameters)
-        force_new = drift_force(pos_new, parameters)
+      # Calculate acceptance ratio for the move
+      acceptance_ratio = jnp.exp(greens_exponent) * (wf_new / wf_old) ** 2
 
-        # Calculate Green's function exponent
-        force_sum = force_old[i] + force_new[i]
-        force_diff = force_old[i] - force_new[i]
-        pos_delta = pos_new[i] - pos_old[i]
-        greens_exponent = jnp.sum(
-          0.5 * force_sum * (0.5 * dt_D * force_diff - pos_delta)
-        )
+      # Update position, probability amplitude and quantum force for accepted moves
+      accept = random.uniform(accept_key) < acceptance_ratio
+      position_old = jnp.where(accept, position_new, position_old)
+      wf_old = jnp.where(accept, wf_new, wf_old)
+      force_old = jnp.where(accept, force_new, force_old)
 
-        # Calculate acceptance ratio for the move
-        acceptance_ratio = jnp.exp(greens_exponent) * (wf_new / wf_old) ** 2
+      # Update energy and energy gradient terms
+      energy_delta = local_energy(position_old, parameters)
+      psi_delta = wavefunction_derivative(position_old, parameters)
 
-        # Update position and probability amplitude for accepted moves
-        accept = random.uniform(accept_key) < acceptance_ratio
-        pos_old = jnp.where(accept, pos_new, pos_old)
-        wf_old = jnp.where(accept, wf_new, wf_old)
-        force_old = jnp.where(accept, force_new, force_old)
-
-        return (pos_old, wf_old, force_old), None
-
-      # Iterate over all particles
-      (
-        (
-          pos_old,
-          wf_old,
-          force_old,
-        ),
-        _,
-      ) = lax.scan(
-        per_particle, (pos_old, wf_old, force_old), jnp.arange(self.number_particles)
+      psi_derivative = tree.map(lambda a, b: a + b, psi_derivative, psi_delta)
+      psi_e_derivative = tree.map(
+        lambda a, b: a + b * energy_delta, psi_e_derivative, psi_delta
       )
 
-      energy_delta = local_energy(pos_old, parameters)
-      psi_derivative = wavefunction_derivative(pos_old, parameters)
-
       return (
-        pos_old,
+        position_old,
         wf_old,
         force_old,
         energy + energy_delta,
-        energy_squared + energy_delta**2,
-        psi_delta + psi_derivative,
-        psi_e_derivative + psi_derivative * energy_delta,
+        psi_derivative,
+        psi_e_derivative,
       ), None
 
-    cycle_keys = random.split(cycle_key, cycles)
-    zero_scalar = jnp.zeros(())  # Initial energy
-    zero_array = jnp.zeros((len(parameters),))
+    # Initialize carry for Monte Carlo cycles
+    zero_params = tree.map(lambda x: jnp.zeros_like(x), parameters)
+    carry_0 = (position_0, wf_0, force_0, 0.0, zero_params, zero_params)
 
     # Iterate over all Monte Carlo cycles
-    (_, _, _, energy, energy_squared, psi_delta, psi_e_derivative), _ = lax.scan(
-      cycle_step,
-      (
-        position_initial,
-        wf_intial,
-        force_initial,
-        zero_scalar,
-        zero_scalar,
-        zero_array,
-        zero_array,
-      ),
-      cycle_keys,
+    cycle_keys = random.split(cycle_key, cycles)
+    (final_state, _) = lax.scan(cycle_step, carry_0, cycle_keys)
+    _, _, _, total_energy, total_psi_delta, total_psi_e = final_state
+
+    # Calculate mean energy and energy gradient
+    energy_mean = total_energy / cycles
+    psi_derivative_mean = tree.map(lambda x: x / cycles, total_psi_delta)
+    psi_e_mean = tree.map(lambda x: x / cycles, total_psi_e)
+
+    energy_gradient = tree.map(
+      lambda pe, pd: 2 * (pe - pd * energy_mean), psi_e_mean, psi_derivative_mean
     )
 
-    energy /= cycles
-    energy_squared /= cycles
-    psi_delta /= cycles
-    psi_e_derivative /= cycles
-    energy_derivative = 2 * (psi_e_derivative - psi_delta * energy)
+    return energy_mean, energy_gradient
 
-    return energy, energy_squared, energy_derivative
+  def sample_importance(
+    self,
+    wavefunction: Callable[[Array, P], Array],
+    local_energy: Callable[[Array, P], Array],
+    drift_force: Callable[[Array, P], Array],
+    parameters: P,
+    time_step: float,
+    diffusion_coefficient: float,
+    cycles: int,
+    seed: int = 0,
+  ) -> tuple[float, NDArray[np.floating]]:
+    rng_key = random.PRNGKey(seed)
+
+    return self._step_importance(
+      wavefunction,
+      local_energy,
+      drift_force,
+      parameters,
+      time_step,
+      diffusion_coefficient,
+      cycles,
+      rng_key,
+    )
 
   def _grid_search[PG: ParameterGrid[P]](
     self,
@@ -404,7 +356,9 @@ class MetropolisJAX[P: NamedTuple]:
     batched_run = vmap(run_one)
 
     # Run Monte Carlo simulation
-    energies, energies_squared = batched_run(batched_params, rng_keys)
+    energies, energy_stores = batched_run(batched_params, rng_keys)
+
+    energies_squared = jnp.mean(energy_stores**2, axis=1)
     variances = energies_squared - energies**2
     error = jnp.sqrt(jnp.abs(variances) / cycles)
 
@@ -511,6 +465,7 @@ class MetropolisJAX[P: NamedTuple]:
 
     return self._grid_search(parameter_grid, cycles, run_one, seed)
 
+  @jit(static_argnums=(0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12))
   def optimize(
     self,
     wavefunction: Callable[[Array, P], Array],
@@ -523,57 +478,71 @@ class MetropolisJAX[P: NamedTuple]:
     cycles: int,
     optimization_iterations: int,
     optimizer: optax.GradientTransformation,
+    gradient_tolerance: float = 1e-3,
     seed: int = 0,
   ):
 
-    ParamType = type(parameters)
-    param_fields = parameters._fields
-    param_array = jnp.array([getattr(parameters, field) for field in param_fields])
-
-    optimizer_state = optimizer.init(param_array)
+    optimizer_state = optimizer.init(parameters)
     rng = random.PRNGKey(seed)
 
-    energy_history: list[float] = []
-    variance_history: list[float] = []
-    error_history: list[float] = []
+    def condition(carry: CarryGradientDescent[P]):
+      i, _, _, _, _, gradient_norm = carry
+      return (gradient_norm > gradient_tolerance) & (i < optimization_iterations)
 
-    best_energy = float("inf")
-    best_params = parameters
+    def update_step(carry: CarryGradientDescent[P]):
+      i, params, opt_state, rng, _, _ = carry
 
-    for i in range(optimization_iterations):
-      rng, key = random.split(rng)
+      key_step, rng_next = random.split(rng)
 
-      energy, energy_squared, grad = self._step_optimization(
+      energy, energy_gradient = self._step_optimization(
         wavefunction,
         wavefunction_derivative,
         local_energy,
         drift_force,
-        parameters,
+        params,
         time_step,
         diffusion_coefficient,
         cycles,
-        key,
+        key_step,
       )
 
-      updates, optimizer_state = optimizer.update(grad, optimizer_state, param_array)
-      param_array = optax.apply_updates(param_array, updates)
-      parameters = ParamType(*param_array)
+      # Calculate gradient norm to test convergence
+      gradient_norm = optax.global_norm(energy_gradient)
 
-      energy_ = float(energy)
-      energy_variance = float(energy_squared - energy_**2)
-      energy_error = np.sqrt(np.abs(energy_variance) / cycles)
+      # Update optimizer state and parameters
+      updates, opt_state_next = optimizer.update(energy_gradient, opt_state, params)
+      params = optax.apply_updates(params, updates)
 
-      energy_history.append(energy_)
-      variance_history.append(energy_variance)
-      error_history.append(energy_error)
+      # Print progress
+      def print_fn():
+        debug.print(
+          "iteration {i}/{t}: E={e:.2f}, grad={g:.3e}, {p}",
+          i=i,
+          t=optimization_iterations,
+          e=energy,
+          g=gradient_norm,
+          p=params,
+        )
 
-      if energy_ < best_energy:
-        best_energy = energy_
-        best_params = parameters
+      lax.cond(i % 10 == 0, print_fn, lambda: None)
 
-    return OptimizationResult(
-      energy_history=np.array(energy_history),
-      variance_history=np.array(variance_history),
-      error_history=np.array(error_history),
-      parameters=best_params,
+      return i + 1, params, opt_state_next, rng_next, energy, gradient_norm
+
+    carry_init = (0, parameters, optimizer_state, rng, jnp.zeros(()), jnp.ones(()))
+    (final_iteration, params_final, _, _, energy_final, gradient_norm_final) = (
+      lax.while_loop(
+        condition,
+        update_step,
+        carry_init,
+      )
     )
+
+    debug.print(
+      "Finished at iteration {i}: E={e:.2f}, grad={g:.3e}, {p}",
+      i=final_iteration + 1,
+      e=energy_final,
+      g=gradient_norm_final,
+      p=params_final,
+    )
+
+    return energy_final, params_final

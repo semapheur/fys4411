@@ -2,6 +2,7 @@ from typing import Callable, NamedTuple
 
 import numpy as np
 from numpy.typing import NDArray
+from numba import njit
 
 
 class BootstrapResult(NamedTuple):
@@ -10,22 +11,30 @@ class BootstrapResult(NamedTuple):
   standard_error: float
 
 
+@njit
+def seed_numba(s: int):
+  """Numba helper function to seed the random number generator."""
+  np.random.seed(s)
+
+
 def timeseries_bootstrap(
   data: NDArray[np.floating],
   statistic: Callable[[NDArray[np.floating]], float],
   samples: int,
   block_size: int,
+  seed: int = 0,
 ):
+  np.random.seed(seed)
 
   statistic_store = np.zeros(samples)
-  data_size = len(data)
-  k = int(np.ceil(float(data_size) / block_size))
+  data_size = data.shape[0]
+  num_blocks = int(np.ceil(float(data_size) / block_size))
 
   for s in range(samples):
     data_ = np.concatenate(
       [
         data[j : j + block_size]
-        for j in np.random.randint(0, data_size - block_size, k)
+        for j in np.random.randint(0, data_size - block_size, num_blocks)
       ]
     )[:data_size]
     statistic_store[s] = statistic(data_)
