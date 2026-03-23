@@ -84,7 +84,11 @@ class MetropolisJAX[P: NamedTuple]:
     """
 
     # Initialize variables
-    position_0 = jnp.zeros((self.number_particles, self.dimensions))
+    rng_key, init_key, cycle_key = random.split(rng_key, 3)
+
+    position_0 = step_size * random.uniform(
+      init_key, (self.number_particles, self.dimensions), minval=-1, maxval=1
+    )
     wf_0 = wavefunction(position_0, parameters)
 
     def cycle_step(
@@ -97,7 +101,9 @@ class MetropolisJAX[P: NamedTuple]:
       walk_key, accept_key = random.split(carry_key)
 
       # Propose new configuration
-      delta = step_size * random.normal(walk_key, (position_old.shape))
+      delta = step_size * random.uniform(
+        walk_key, position_old.shape, minval=-1, maxval=1
+      )
       position_new = position_old + delta
 
       # Calculate probability amplitude for proposed configuration
@@ -121,7 +127,7 @@ class MetropolisJAX[P: NamedTuple]:
     carry_0 = (position_0, wf_0, zero_scalar)
 
     # Iterate over all Monte Carlo cycles
-    cycle_keys = random.split(rng_key, cycles)
+    cycle_keys = random.split(cycle_key, cycles)
     (_, _, energy), energy_accummulator = lax.scan(cycle_step, carry_0, cycle_keys)
 
     cycle_counts = jnp.arange(1, cycles + 1)

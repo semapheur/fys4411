@@ -12,7 +12,7 @@ exports:
 math:
   # Note the 'single quotes'
   '\argmin': '\operatorname{argmin}'
-  \drm': '\mathrm{d}'
+  '\drm': '\mathrm{d}'
   '\N': '\mathbb{N}'
   '\R': '\mathbb{R}'
   '\unitvec': '{\hat{\mathbf{#1}}}'
@@ -39,7 +39,7 @@ $$
 \label{equation:trap-potential}
   V_\text{ext} (\mathbf{r}) = \begin{cases}
     \frac{1}{2} m\omega_\text{ho}^2 r^2,\quad& (S) \\
-    \frac{1}{2} m\omega_\text{ho}^2 (x^2 + y^2) + \omega_z^2 z^2,\quad (E)
+    \frac{1}{2} m[\omega_\text{ho}^2 (x^2 + y^2) + \omega_z^2 z^2],\quad& (E)
   \end{cases},
 $$
 
@@ -79,6 +79,44 @@ $$
   \end{cases}
 $$
 
+### Dimensionless Hamiltonian
+
+For numerical analysis, it is convenient to express the Hamiltonian [](#equation:hamiltonian) in dimensionless form. This can be done by introducing dimensionless coordinates $\mathbf{r}' = \mathbf{r}/a_\text{ho}$, where
+
+$$
+  a_\text{ho} := \sqrt{\frac{\hbar}{m\omega_\text{ho}}}
+$$
+
+is the characteristic length of a spherical trap. Substituting $\mathbf{r} = a_\text{ho} \mathbf{r}$ into the external potential [](#equation:trap-potential), the ellictical trap case becomes
+
+$$
+\begin{align*}
+  V_\text{ext} (\mathbf{r}) =& \frac{1}{2} \underbrace{m a_\text{ho}^2}_{\hbar/\omega_\text{ho}} [\omega_\text{ho} ({x'}^2 + {y'}^2) + \omega_z^2 {z'^2}] \\
+  =& \frac{1}{2} \hbar \omega_\text{ho} \left[{x'}^2 + {y'}^2 + \left(\frac{\omega_z}{\omega_\text{ho}} \right)^2 {z'}^2 \right]
+\end{align*}
+$$
+
+In terms of the dimensionless coordinates, the gradient and Laplacian transform as
+
+$$
+  \nabla_i = \frac{1}{a_\text{ho}} \nabla'_i,\quad \nabla_i^2 = \frac{1}{a_\text{ho}^2} {\nabla'_i}^2
+$$
+
+The single-particle kinetic term therefore becomes
+
+$$
+  -\frac{\hbar^2}{2m} \nabla_i^2 = -\frac{\hbar^2}{2m}\frac{1}{a_\text{ho}} {\nabla'_i}^2 = -\frac{\hbar}{2m}{m\omega_\text{ho}}{\hbar} {\nabla'_i}^2 = -\frac{\hbar\omega_\text{ho}}{2} {\nabla'_i}^2
+$$
+
+Dividing by the charateristic energy scale $\hbar\omega_\text{ho}$ and introducing the anisotropoy parameter $\gamma = \omega_z / \omega_\text{ho}$, we obtain the dimensionless many-body Hamiltonian
+
+$$
+\label{equation:hamiltonian-dimensionless}
+  \hat{H} = \sum_{i=1}^N \frac{1}{2} (-\nabla_i^2 + x_i^2 + y_i^2 + \gamma^2 z_i^2) + \sum_{i < j} V_\text{int} (|\mathbf{r}_i - \mathbf{r}_j|)
+$$
+
+The special case $\gamma = 1$ corresponds to an spherical (isotropic) trap.
+
 ### Local Energy
 
 To prepare the variational Monte Carlo computation, we derive the local energy energy associated with the trial wave function. Introducing $\mathbf{R} = (\mathbf{r}_1,\dots,\mathbf{r}_N) \in\R^{3N}$, the local energy is defined pointwise by
@@ -105,7 +143,7 @@ $$
 
 so that the system consists of $N$ non-interacting bosons in the external trapping potential.
 
-For convenience, we consider the isotropic case $\beta 1$ deriving an analytical expression for the local energy $E_L$ in a $d$-dimensional system. In this case, the trial wave function [](#equation:trial-wavefunction-noninteracting) factorizes as
+For a spherical trap potential corresponding to $\beta = 1$, we can derive the exact solution for the ground state energy. In this case, the trial wave function [](#equation:trial-wavefunction-noninteracting) factorizes as
 
 $$
 \label{equation:trial-wavefunction-noninteracting-isotropic}
@@ -128,22 +166,24 @@ $$
 which separates into a sum of identical single-particle contributions. Evaluating the Laplacian $\nabla_i \phi(\mathbf{r}_i)$ for each $i$ yields
 
 $$
-  \frac{\nabla_i^2 \phi(\mathbf{r}_i)}{\phi(\mathbf{r}_i)} = 4\alpha^2 r_i^2 - 2d\alpha
+  \frac{\nabla_i^2 \phi(\mathbf{r}_i)}{\phi(\mathbf{r}_i)} = 4\alpha^2 r_i^2 - 2d\alpha,
 $$
 
-Assuming a spherical trap potential in [](#equation:trap-potential), the local energy [](#equation:local-energy-noninteracting) becomes
+where $d$ is the spatial dimension of the system.
+
+Inserting the spherical trap potential from [](#equation:trap-potential), the local energy [](#equation:local-energy-noninteracting) becomes
 
 $$
   E_L (\mathbf{R}) = \frac{d\hbar^2 \alpha N}{m} + \sum_{i=1}^N \left(\frac{1}{2} m\omega_\text{ho}^2 - \frac{2\hbar^2 \alpha^2}{m} \right) r_i^2.
 $$
 
-We note that the sum vanishes when
+The sum vanishes when
 
 $$
   \alpha = \frac{m\omega_\text{ho}}{2\hbar},
 $$
 
-corresponding to the exact harmonic-oscillator ground state. In this case, the local energy becomes the constant
+which corresponds to the exact ground-state width of the harmonic-oscillator. In this case, the local energy becomes a constant,
 
 $$
   E_L = \frac{d}{2} N\hbar \omega_\text{ho},
@@ -176,17 +216,22 @@ $$
   \Psi_T (\mathbf{R}) = \left(\prod_{i=1}^N \phi(\mathbf{r}_k) \right) \exp\left(\sum_{j < k} u(r_{jk}) \right)
 $$
 
-where $\phi(\mathbf{r}_i) = g(\alpha,\beta,\mathbf{r}_i)$, $r_{ij} = |\mathbf{r}_i - \mathbf{r}_j|$ and $f(r_{ij}) = e^{u(r_{ij})}$. In this form, the Laplacian of $\Psi_T$ can be shown to satisfy the identity
+where $\phi(\mathbf{r}_i) = g(\alpha,\beta,\mathbf{r}_i)$, $r_{ij} = |\mathbf{r}_i - \mathbf{r}_j|$ and $f(r_{ij}) = e^{u(r_{ij})}$. In this form, the logarithmic Laplacian of $\Psi_T$ becomes
 
 $$
 \label{equation:trial-wavefunction-interacting-laplacian}
-\begin{equation*}
 \begin{split}
-  \frac{1}{\Psi_T} \nabla_k^2 \Psi_T (\mathbf{r}) =& \frac{\nabla_k^2 \phi(\mathbf{r}_k)}{\phi(\mathbf{r}_k)} + 2\frac{\nabla_k \phi(\mathbf{r}_k)}{\phi(\mathbf{r}_k)} \left(\sum_{j\neq k} \frac{(\mathbf{r}_k - \mathbf{r}_j)}{r_{kj}} u'(r_{kj}) \right) \\
-  &+ \sum_{i\neq k} \sum_{j\neq k} \frac{(\mathbf{r}_k - \mathbf{r}_i)(\mathbf{r}_k - \mathbf{r}_j)}{r_{ki} r_{kj}} u'(r_{ki}) u'(r_{kj}) \\
-  &+ \sum_{j\neq k} \left(u'' (r_{kj}) + \frac{2}{r_{kj}} u' (r_{kj}) \right)
+  \frac{1}{\Psi_T (\mathbf{R})} \nabla_i^2 \Psi_T (\mathbf{R}) =& -2\alpha(2 + \beta) + 4\alpha^2 (x_i^2 + y_i^2 + \beta^2 z_i^2) \\
+  &- 4\alpha a \sum_{j\neq i} \frac{(x_i - x_j)x_k + (y_i - y_j)y_k + \beta(z_i - z_j)z_k}{r_{ij}^2 (r_{ij} - a)} \\
+  &+ a^2 \sum_{j\neq i} \sum_{k\neq i} \frac{(\mathbf{r}_i - \mathbf{r}_j)\cdot(\mathbf{r}_i - \mathbf{r}_k)}{r_{ij}^2 r_{ik}^2 (r_{ij} - a)(r_{ik} - a)} \\
+  &- a^2 \sum_{j\neq i} \frac{1}{r_{ij}^2 (r_{ij} - a)^2}
 \end{split}
-\end{equation*}
+$$
+
+In terms of the dimensionless Hamiltonian in [](#equation:hamiltonian-dimensionless), the local energy becomes
+
+$$
+  E_L (\mathbf{R}) = \sum_{i=1}^N \frac{1}{2} \left(-\frac{\nabla^2 \Psi_T(\mathbf{R})}{\Psi_T (\mathbf{R})} + x_i^2 + y_i^2 + \gamma^2 z_i^2 \right) + \sum_{i < j} V_\text{int} (|\mathbf{r}_i - \mathbf{r}_j|)
 $$
 
 ## Variational Monte Carlo Estimation
@@ -425,7 +470,7 @@ $$
 Substituting this, together with the sperical trap potential
 
 $$
-  V_\text{ext} (\mathbf{r}_i) = \frac{1}{2}m\omega^2_\text{ho} r_i^2
+  V_\text{ext} (\mathbf{r}_i) = \frac{1}{2}m\omega_\text{ho}^2 r_i^2,
 $$
 
 into [](#equation:local-energy-spherical-noninteracting), we find
@@ -434,13 +479,13 @@ $$
 \begin{align*}
   E_L (\mathbf{R}) =& \sum_{i=1}^N \left(-\frac{\hbar^2}{2m} (4\alpha^2 r_i^2 - 2d\alpha) + \frac{1}{2} m\omega_\text{ho}^2 r_i^2 \right) \\
   =& \sum_{i=1}^N \left(\frac{d\hbar^2 \alpha}{m} - \frac{2\hbar^2 \alpha^2}{m} r_i^2 + \frac{1}{2} m\omega_\text{ho}^2 r_i^2 \right) \\
-  =& \frac{d\hbar^2 \alpha N}{m} + \sum_{i=1}^N \left(\frac{1}{2}m\omega_\text{ho}^2 - \frac{2\hbar^2 \alpha^2}{m} \right) r_i^2
+  =& \frac{d\hbar^2 \alpha N}{m} + \sum_{i=1}^N \left(\frac{1}{2} m \omega_\text{ho}^2 - \frac{2\hbar^2 \alpha^2}{m} \right) r_i^2
 \end{align*}
 $$
 
 ## Local Energy in the Interacting Case
 
-To derive the Laplacian identity [](#equation:trial-wavefunction-interacting-laplacian), we introduce
+To derive the logarithmic Laplacian [](#equation:trial-wavefunction-interacting-laplacian), we substitute
 
 $$
   A(\mathbf{R}) = \prod_{i=1}^N \phi(\mathbf{r}_i),\quad B(\mathbf{R}) = \exp\left(\sum_{j < k} u(r_{jk}) \right), 
@@ -449,10 +494,13 @@ $$
 such that $\Psi_T$ in [](#equation:trial-wavefunction-interacting) can be factored as
 
 $$
+\label{equation:trial-wavefunction-refactor}
   \Psi_T (\mathbf{R}) = A(\mathbf{R}) B(\mathbf{R})
 $$
 
-Taking the gradient and appling the product rule yields
+### Logarithmic Gradient of $\Psi_T$
+
+Taking the gradient of [](#equation:trial-wavefunction-refactor) and appling the product rule yields
 
 $$
   \nabla_k \Psi_T  = (\nabla_k A) B + A \nabla_k B
@@ -461,10 +509,10 @@ $$
 The first gradient $\nabla_k A$ is given by
 
 $$
-  \nabla_k A(\mathbf{R}) = \nabla_k \left(\prod_{i=1}^N \phi(\mathbf{r}_i) \right) = \left(\prod_{i\neq k} \phi(\mathbf{r}_i) \right) \nabla_k \phi(\mathbf{r}_k)
+  \nabla_k A(\mathbf{R}) = \nabla_k \left(\prod_{i=1}^N \phi(\mathbf{r}_i) \right) = \left(\prod_{i\neq k} \phi(\mathbf{r}_i) \right) \nabla_k \phi(\mathbf{r}_k),
 $$
 
-since only the factor $\phi(\mathbf{r}_k)$ depends on $\mathbf{r}_k$. To calculate the second gradient $\nabla_k B$, we first substitute $U(\mathbf{R}) = \sum_{j < k} u(r_{ij})$, such that $B = e^U$. The chain rule yields $\nabla_k B = B \nabla_k U$, hence
+because only the factor $\phi(\mathbf{r}_k)$ depends on $\mathbf{r}_k$. To calculate the second gradient $\nabla_k B$, we first substitute $U(\mathbf{R}) = \sum_{j < k} u(r_{ij})$, such that $B = e^U$. The chain rule yields $\nabla_k B = B \nabla_k U$, hence
 
 $$
   \nabla_k B(\mathbf{R}) = B(\mathbf{R}) \sum_{j\leq k} \nabla_k u(r_{jk})
@@ -476,7 +524,6 @@ $$
 \begin{align*}
   \nabla_k \Psi_T (\mathbf{R}) =& \exp\left(\sum_{j < m} u(r_{jm}) \right) \left(\prod_{i\neq k} \phi(\mathbf{r}_i) \right) \nabla_k \phi(\mathbf{r}_k) \\
   &+ \left(\prod_{i=1}^N \phi(\mathbf{r}_i) \right) \exp\left(\sum_{j < m} u(r_{jm}) \right) \sum_{l\neq k} \nabla_k u(r_{kl}) \\
-  =& \Psi_T (\mathbf{R}) 
 \end{align*}
 $$
 
@@ -486,7 +533,7 @@ $$
   \frac{\nabla_k \Psi_T (\mathbf{R})}{\Psi_T (\mathbf{R})} = \frac{\nabla_k \phi(\mathbf{r}_k)}{\phi(\mathbf{r}_k)} + \sum_{l\neq k} \nabla_k u(r_{kl})
 $$
 
-To evaluate $\nabla_k u(r_{kj})$, we apply the chain rule, giving $\nabla_k u(r_{kj}) = u' (r_{kj}) \nabla_k r_kj$. Introducing $\mathbf{r} := \mathbf{r}_k - \mathbf{r}_j$, such that $r_{kj} = |\mathbf{r}|$ we get
+To evaluate $\nabla_k u(r_{kj})$, we apply the chain rule, giving $\nabla_k u(r_{kj}) = u' (r_{kj}) \nabla_k r_kj$. Introducing $\mathbf{r} := \mathbf{r}_k - \mathbf{r}_j$, such that $r_{kj} = |\mathbf{r}|$, we get
 
 $$
   \nabla_k r_{kj} = \nabla_k (\mathbf{r} \cdot \mathbf{r})^{1/2} = \frac{1}{2} (\mathbf{r}\cdot\mathbf{r})^{-1/2} \nabla_k (\mathbf{r}\cdot\mathbf{r})
@@ -510,7 +557,9 @@ $$
   \nabla_k u(r_{jk}) = u'(r_{kj}) \frac{\mathbf{r}_k - \mathbf{r}_j}{r_{kj}}
 $$
 
-To derive the Laplacian of $\Psi_T$, we define
+### Logarithmic Laplacian of $\Psi_T$
+
+To derive the logarithmic Laplacian of $\Psi_T$, we define
 
 $$
   \mathbf{F}_T := \frac{\nabla_k \Psi_T}{\Psi_T}
@@ -553,7 +602,7 @@ $$
 with
 
 $$
-  |\mathbf{B}_k|^2 = \sum_{i\neq k} \sum_{j\neq k} \frac{(\mathbf{r}_k - \mathbf{r}_i)(\mathbf{r}_k - \mathbf{r}_j)}{r_{ki} r_{kj}} u'(r_{ki}) u'(r_{kj})
+  |\mathbf{B}_k|^2 = \sum_{i\neq k} \sum_{j\neq k} \frac{(\mathbf{r}_k - \mathbf{r}_i)\cdot(\mathbf{r}_k - \mathbf{r}_j)}{r_{ki} r_{kj}} u'(r_{ki}) u'(r_{kj})
 $$
 
 The divergence term in [](#equation:laplacian-identity-simplified) is given by the product rule
@@ -567,23 +616,23 @@ where the first term evaluates to
 $$
 \begin{align*}
   \nabla_k \cdot \mathbf{A}_k =& \nabla_k \cdot \left(\frac{\nabla_k \phi}{\phi} \right) = \nabla_k \left(\frac{1}{\phi} \right) \cdot \nabla_k \phi + \frac{1}{\phi} \nabla_k^2 \phi \\
-  =& -\frac{1}{\phi^2} (\nabla_k \phi) \cdot (\nabla_k \phi) - \frac{1}{\phi} \nabla_k^2 \phi  = \frac{\nabla_k^2 \phi(\mathbf{r}_k)}{\phi(\mathbf{r}_k)} - \left|\frac{\nabla_k \phi(\mathbf{r}_k)}{\phi(\mathbf{r}_k)} \right|^2
+  =& -\frac{1}{\phi^2} (\nabla_k \phi) \cdot (\nabla_k \phi) + \frac{1}{\phi} \nabla_k^2 \phi  = \frac{\nabla_k^2 \phi(\mathbf{r}_k)}{\phi(\mathbf{r}_k)} - \left|\frac{\nabla_k \phi(\mathbf{r}_k)}{\phi(\mathbf{r}_k)} \right|^2
 \end{align*}
 $$
 
-Defining
+For the second term, we define the substitutions
 
 $$
-  \mathbf{x} := \mathbf{r}_k - \mathbf{r}_j,\quad x := r_{kj},\quad v(x) = \frac{u'(x)}{x}
+  \mathbf{x} := \mathbf{r}_k - \mathbf{r}_j,\quad x := r_{kj},\quad v(x) = \frac{u'(x)}{x},
 $$
 
-we can write
+so that
 
 $$
   u'(r_{kj}) \frac{\mathbf{r}_k - \mathbf{r}_j}{r_{kj}} = v(x) \mathbf{x}
 $$
 
-Using $\nabla_\mathbf{x} = \nabla_r$, the divergence product rule yields
+Since $\nabla_\mathbf{x} = \nabla_k$, the divergence product rule yields
 
 $$
 \begin{align*}
@@ -592,13 +641,13 @@ $$
 \end{align*} 
 $$
 
-Since
+Applying the quotient rule to $v(x) = u'(x)/x$
 
 $$
-  g'(r) = \frac{\mathrm{d}}{\mathrm{d}r} \left(\frac{u'(r)}{r} \right) = \frac{u''(r)r - u'(r)}{r^2}
+  v'(x) = \frac{u''(x)x - u'(x)}{x^2},
 $$
 
-we get
+and substituting, yields
 
 $$
   \nabla_\mathbf{x} \cdot (v(x) \mathbf{x}) = \frac{u''(x) - u'(x)}{x} + \frac{3u'(x)}{x} = u''(x) + \frac{2}{x} u'(x)
@@ -612,19 +661,58 @@ $$
 \end{align*} 
 $$
 
-and
+and summing over $j \neq k$,
 
 $$
-  \nabla_k \cdot \mathbf{B}_k = \sum_{j\neq k} \left(u'' (r_{kj}) + \frac{2}{r_{kj}} u'(r_{kj}) \right)
+  \nabla_k \cdot \mathbf{B}_k = \sum_{j\neq k} \left(u'' (r_{kj}) + \frac{2}{r_{kj}} u'(r_{kj}) \right).
 $$
 
-Combining the terms, we end up with
+Combining the terms, the logarithmic Laplacian of $\Psi_T$ takes the form
+
+$$
+\label{equation:wavefunction-logarithmic-laplacian}
+\begin{split}
+  \frac{1}{\Psi_T} \nabla_k^2 \Psi_T (\mathbf{r}) =& \frac{\nabla_k^2 \phi(\mathbf{r}_k)}{\phi(\mathbf{r}_k)} + 2\frac{\nabla_k \phi(\mathbf{r}_k)}{\phi(\mathbf{r}_k)} \left(\sum_{j\neq k} \frac{(\mathbf{r}_k - \mathbf{r}_j)}{r_{kj}} u'(r_{kj}) \right) \\
+  &+ \sum_{i\neq k} \sum_{j\neq k} \frac{(\mathbf{r}_k - \mathbf{r}_i)\cdot(\mathbf{r}_k - \mathbf{r}_j)}{r_{ki} r_{kj}} u'(r_{ki}) u'(r_{kj}) \\
+  &+ \sum_{j\neq k} \left(u'' (r_{kj}) + \frac{2}{r_{kj}} u' (r_{kj}) \right)
+\end{split}
+$$
+
+To obtained a closed analytical form of this expression, we compute the logarithmic gradient and Laplacian of $\phi$. The logarithmic gradient of $\phi$ is given by
+
+$$
+  \frac{\nabla \phi(\mathbf{r})}{\phi(\mathbf{r})} = \nabla \ln[\phi(\mathbf{r})] = -2\alpha(x \unitvec{x} + y \unitvec{y} + \beta z \unitvec{z}), \mathbf{r} = (x, y, z) \in \R^3
+$$
+
+and the logarithmic Laplacian of $\phi$ is given by
 
 $$
 \begin{align*}
-  \frac{1}{\Psi_T} \nabla_k^2 \Psi_T (\mathbf{r}) =& \frac{\nabla_k^2 \phi(\mathbf{r}_k)}{\phi(\mathbf{r}_k)} + 2\frac{\nabla_k \phi(\mathbf{r}_k)}{\phi(\mathbf{r}_k)} \left(\sum_{j\neq k} \frac{(\mathbf{r}_k - \mathbf{r}_j)}{r_{kj}} u'(r_{kj}) \right) \\
-  &+ \sum_{i\neq k} \sum_{j\neq k} \frac{(\mathbf{r}_k - \mathbf{r}_i)(\mathbf{r}_k - \mathbf{r}_j)}{r_{ki} r_{kj}} u'(r_{ki}) u'(r_{kj}) \\
-  &+ \sum_{j\neq k} \left(u'' (r_{kj}) + \frac{2}{r_{kj}} u' (r_{kj}) \right)
+  \frac{\nabla^2 \phi(\mathbf{r})}{\phi(\mathbf{r})} =& \nabla^2 (\ln[\phi(\mathbf{r})]) + |\nabla (\ln[\phi(\mathbf{r})])|^2 \\
+  =& -2\alpha(2 + \beta) + 4\alpha^2 (x^2 + y^2 + \beta^2 y^2)
+\end{align*}
+$$
+
+Furthermore, we have for $a > 0$
+
+$$
+  u'(r) = \frac{\drm}{\drm r} \ln[f(a, r)] = \frac{\drm}{\drm r} \ln\left(1 - \frac{1}{r} \right) = \frac{a}{r^2} \frac{1}{1 - a/r} = \frac{a}{r^2 - ar}
+$$
+
+and with $g(r) = r^2 - ar$ and $g'(r) = 2r - a$
+
+$$
+  u''(r) = -a\frac{g'(r)}{g(r)^2} = \frac{a^2 - 2ar}{(r^2 - ar)^2}
+$$
+
+Inserting the calculated derivatives into [](#equation:wavefunction-logarithmic-laplacian) and simplifying, we arrived at
+
+$$
+\begin{align*}
+  \frac{1}{\Psi_T (\mathbf{R})} \nabla_k^2 \Psi_T (\mathbf{R}) =& -2\alpha(2 + \beta) + 4\alpha^2 (x_k^2 + y_k^2 + \beta^2 z_k^2) \\
+  &- 4\alpha a \sum_{j\neq k} \frac{(x_k - x_j)x_k + (y_k - y_j)y_k + \beta(z_k - z_j)z_k}{r_{kj} (r_{kj}^2 - ar_{kj})} \\
+  &+ a^2 \sum_{i\neq k} \sum_{j\neq k} \frac{(\mathbf{r}_k - \mathbf{r}_i)\cdot(\mathbf{r}_k - \mathbf{r}_j)}{r_{ki} r_{kj} (r_{ki}^2 - ar_{ki})(r_{kj}^2 - ar_{kj})} \\
+  &- a^2 \sum_{j\neq k} \frac{1}{r_{kj}^2 (r_{kj} - a)^2}
 \end{align*}
 $$
 

@@ -1,10 +1,10 @@
 from typing import Callable, NamedTuple
 
 import numpy as np
-from numba import njit
+from numba import njit, prange
 from numpy.typing import NDArray
 from stats import seed_numba
-from structs import ParameterGrid
+from structs import ParameterGrid, ParamConstructor
 
 type ScalarFunction[P: NamedTuple] = Callable[[NDArray[np.floating], P], float]
 type VectorFunction[P: NamedTuple] = Callable[
@@ -57,6 +57,10 @@ def metropolis_step_numba[P: NamedTuple](
 
   # Initialize variables
   positions = np.zeros((number_particles, dimension), dtype=np.float64)
+  for i in range(number_particles):
+    for j in range(dimension):
+      positions[i, j] = step_size * (np.random.randn() - 0.5)
+
   row_store = np.empty(dimension, dtype=np.float64)
 
   wf_old = wavefunction(positions, parameters)
@@ -288,6 +292,42 @@ def metropolis_step_optimization_numba[P: NamedTuple](
   return energy, energy_gradient
 
 
+@njit(parallel=True)
+def run_grid_search_numba[P: NamedTuple](
+  wavefunction: ScalarFunction[P],
+  local_energy: ScalarFunction[P],
+  param_matrix: NDArray[np.floating],
+  param_type: ParamConstructor[P],
+  step_size: float,
+  cycles: int,
+  number_particles: int,
+  dimension: int,
+):
+
+  iterations = param_matrix.shape[0]
+  energies = np.empty(iterations)
+  variances = np.empty(iterations)
+
+  for i in prange(iterations):
+    row = param_matrix[i]
+    parameters = construct_params(param_type, row)
+
+    energy, energy_store = metropolis_step_numba(
+      wavefunction,
+      local_energy,
+      parameters,
+      step_size,
+      cycles,
+      number_particles,
+      dimension,
+    )
+
+    energies[i] = energy
+    variances[i] = np.var(energy_store)
+
+  return energies, variances
+
+
 class Metropolis[P: NamedTuple]:
   """
   Class for performing Monte Carlo simulations using the Metropolis algorithm.
@@ -339,7 +379,7 @@ class Metropolis[P: NamedTuple]:
     energies_, energy_stores_ = zip(*(metropolis_step(p) for p in params_list))
     energies = np.array(energies_)
     energy_stores = np.vstack(energy_stores_)
-    energies_squared = np.mean(energy_stores**2, axis=0)
+    energies_squared = np.mean(energy_stores**2, axis=1)
     variances = energies_squared - energies**2
     error = np.sqrt(np.abs(variances) / cycles)
 
