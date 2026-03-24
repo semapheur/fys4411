@@ -147,7 +147,7 @@ For a spherical trap potential corresponding to $\beta = 1$, we can derive the e
 
 $$
 \label{equation:trial-wavefunction-noninteracting-isotropic}
-  \Psi_T (\mathbf{R}) = \prod_{i=1}^N e^{-\alpha r_i^2},\; r_i = |\mathbf{r}_i| = \exp\left(\alpha \sum_{i=1}^N r_i^2 \right).
+  \Psi_T (\mathbf{R}) = \prod_{i=1}^N e^{-\alpha r_i^2} = \exp\left(\alpha \sum_{i=1}^N r_i^2 \right),\; r_i = |\mathbf{r}_i| =.
 $$
 
 Defining the one-particle factor $\phi(\mathbf{r}_i) := \exp(-\alpha r_i^2)$, the Laplacian of $\Psi_T$ can be shown to satisfy
@@ -191,16 +191,6 @@ $$
 
 which coincides with the exact ground state-energy of $N$ non-interacting bosons in a spherical harmonic trap.
 
-##### Drift Force
-
-In the non-interacting case, the drift force used for importance sampling is given by
-
-$$
-  \mathbf{F}_i = \frac{2\nabla_i \Psi_T (\mathbf{R})}{\Psi_T (\mathbf{R})} = -4\alpha \mathbf{r}_i,
-$$
-
-where we have used [](#equation:gradient).
-
 #### Interacting Case
 
 In the interacting case $a > 0$, the local energy takes the form
@@ -209,14 +199,13 @@ $$
   E_L (\mathbf{R}) = \sum_{i=1}^N \left(-\frac{\hbar^2}{2m} \frac{\nabla_i^2 \Psi_T (\mathbf{R})}{\Psi_T (\mathbf{R})} + V_\text{ext}(\mathbf{r}_i) \right) + \sum_{i=1}^N \sum_{j=i+1}^N V_\text{int} (\mathbf{r}_i, \mathbf{r}_j)
 $$
 
-To evaluate this expression, we begin by rewriting $\Psi_T$ in [](#equation:trial-wavefunction) as
+Applying the dimensionless Hamiltonian [](#equation:hamiltonian-dimensionless), this can be recast as
 
 $$
-\label{equation:trial-wavefunction-interacting}
-  \Psi_T (\mathbf{R}) = \left(\prod_{i=1}^N \phi(\mathbf{r}_k) \right) \exp\left(\sum_{j < k} u(r_{jk}) \right)
+  E_L (\mathbf{R}) = \sum_{i=1}^N \frac{1}{2} \left(-\frac{\nabla^2 \Psi_T(\mathbf{R})}{\Psi_T (\mathbf{R})} + x_i^2 + y_i^2 + \gamma^2 z_i^2 \right) + \sum_{i < j} V_\text{int} (|\mathbf{r}_i - \mathbf{r}_j|)
 $$
 
-where $\phi(\mathbf{r}_i) = g(\alpha,\beta,\mathbf{r}_i)$, $r_{ij} = |\mathbf{r}_i - \mathbf{r}_j|$ and $f(r_{ij}) = e^{u(r_{ij})}$. In this form, the logarithmic Laplacian of $\Psi_T$ becomes
+As shown in [](#Logarithmic Gradient of the Trial Wavefunction), the analytic expression for the logarithmic Laplacian of $\Psi_T$ is
 
 $$
 \label{equation:trial-wavefunction-interacting-laplacian}
@@ -228,80 +217,72 @@ $$
 \end{split}
 $$
 
-In terms of the dimensionless Hamiltonian in [](#equation:hamiltonian-dimensionless), the local energy becomes
-
-$$
-  E_L (\mathbf{R}) = \sum_{i=1}^N \frac{1}{2} \left(-\frac{\nabla^2 \Psi_T(\mathbf{R})}{\Psi_T (\mathbf{R})} + x_i^2 + y_i^2 + \gamma^2 z_i^2 \right) + \sum_{i < j} V_\text{int} (|\mathbf{r}_i - \mathbf{r}_j|)
-$$
-
 ## Variational Monte Carlo Estimation
 
-The ground state energy of the bose gas correlated model can be estimated using variational Monte Carlo methods. The expectation value of the Hamiltonian $\hat{H}$, in the state $\Psi_T (\mathbf{R}; \alpha, \beta)$ is given by
+The ground state energy of the bose gas correlated model can be estimated using variational Monte Carlo methods. For a trial wavefunction $\Psi_T (\mathbf{R}; \boldsymbol{\alpha})$, the variational energy is defined as the expectation value of the Hamiltonian $\hat{H}$:
 
 $$
-\begin{equation*}
 \label{equation:hamiltonian-expectation}
 \begin{split}
-  E(\alpha, \beta) :=& \braket{H}_{\Psi_T} = \frac{\braket{\Psi_T (\mathbf{R}; \alpha, \beta), \hat{H} \Psi_T (\mathbf{R}, \alpha, \beta)}}{\braket{\Psi(\mathbf{R}, \alpha, \beta), \Psi_T (\mathbf{R}; \alpha, \beta)}} \\
-  =& \frac{\int_{\R^{3N}} \Psi_T^* (\mathbf{R}; \alpha, \beta) \hat{H}\Psi_T (\mathbf{R}; \alpha, \beta) \;\drm\mathbf{R}}{\int_{\R^{3N}} |\Psi_T (\mathbf{R}; \alpha, \beta)|^2 \;\drm\mathbf{R}}
+  E(\boldsymbol{\alpha}) :=& \braket{H}_{\Psi_T} = \frac{\braket{\Psi_T (\mathbf{R}; \boldsymbol{\alpha}), \hat{H} \Psi_T (\mathbf{R}, \boldsymbol{\alpha})}}{\braket{\Psi(\mathbf{R}, \boldsymbol{\alpha}), \Psi_T (\mathbf{R}; \boldsymbol{\alpha})}} \\
+  =& \frac{\int_{\R^{3N}} \Psi_T^* (\mathbf{R}; \boldsymbol{\alpha}) \hat{H}\Psi_T (\mathbf{R}; \boldsymbol{\alpha}) \;\drm\mathbf{R}}{\int_{\R^{3N}} |\Psi_T (\mathbf{R}; \boldsymbol{\alpha})|^2 \;\drm\mathbf{R}},
 \end{split}
-\end{equation*}
 $$
 
-By the Rayleigh-Ritz principle $E(\alpha, \beta) \geq E_0$, where $E_0$ is the ground-state energy. Thus, we can approximate $E_0$ by minimizing $E(\alpha, \beta)$ over the parameters $(\alpha, \beta)$.
+where $\boldsymbol{\alpha}$ denotes a vector of variational parameters. By the Rayleigh-Ritz principle $E(\boldsymbol{\alpha}) \geq E_0$, where $E_0$ is the ground-state energy. Thus, we can approximate $E_0$ by minimizing $E(\boldsymbol{\alpha})$ over the parameters $\boldsymbol{\alpha}$.
 
 To enable Monte Carlo estimation, we expand the variational energy [](#equation:trial-wavefunction) in terms of the probability density function
 
 $$
 \label{equation:wavefunction-pdf}
-  P_{\alpha,\beta} (\mathbf{R}) = \frac{|\Psi_T (\mathbf{R}; \alpha, \beta)|^2}{\int_{\R^{3N}} |\Psi_T (\mathbf{R}; \alpha, \beta)|^2 \;\drm\mathbf{R}}
+  P_{\boldsymbol{\alpha}} (\mathbf{R}) = \frac{|\Psi_T (\mathbf{R}; \boldsymbol{\alpha})|^2}{\int_{\R^{3N}} |\Psi_T (\mathbf{R}; \boldsymbol{\alpha})|^2 \;\drm\mathbf{R}}
 $$
 
 Substituting the local energy [](#equation:trial-wavefunction), the variational energy can be written as the expectation value
 
 $$
 \label{equation:variation-energy-expectation}
-  E(\alpha, \beta) = \int_{\R^{3N}} P_{\alpha,\beta} (\mathbf{R}) E_L (\mathbf{R}; \alpha, \beta) \;\drm\mathbf{R} = \mathbb{E}_{P_{\alpha, \beta}} (E_L)
+  E(\boldsymbol{\alpha}) = \int_{\R^{3N}} P_{\boldsymbol{\alpha}} (\mathbf{R}) E_L (\mathbf{R}; \boldsymbol{\alpha}) \;\drm\mathbf{R} = \mathbb{E}_{P_{\boldsymbol{\alpha}}} (E_L)
 $$
 
-Consequently, computing $E(\alpha, \beta)$ reduces to sampling from $P_{\alpha,\beta} (\mathbf{R}) \propto |\Psi_T (\mathbf{R}, \alpha, \beta)|^2$. However, the normalization constant
+Consequently, computing $E(\boldsymbol{\alpha})$ reduces to sampling from $P_{\boldsymbol{\alpha}} (\mathbf{R}) \propto |\Psi_T (\mathbf{R}, \boldsymbol{\alpha})|^2$. However, the normalization constant
 
 $$
-  Z = \int_{\R^{3N}} |\Psi_T (\mathbf{R}, \alpha,\beta)|^2 \;\d\mathbf{R}
+  Z = \int_{\R^{3N}} |\Psi_T (\mathbf{R}, \boldsymbol{\alpha})|^2 \;\drm\mathbf{R}
 $$
 
-is intractable in high dimensions, making direct sampling from $P_{\alpha,\beta}$ unfeasible. To overcome this, we can employ the Metropolis-Hastings algorithm to construct a Markov chain $\set{\mathbf{R}^{(k)}}_{k\geq 0}$ whose stationary distribution is $P_{\alpha,\beta}$.
+is intractable in high dimensions, making direct sampling from $P_{\boldsymbol{\alpha}}$ unfeasible. To overcome this, we can employ the Metropolis-Hastings algorithm to construct a Markov chain $\set{\mathbf{R}^{(k)}}_{k\geq 0}$ whose stationary distribution is $P_{\boldsymbol{\alpha}}$.
 
 Given the current state $\mathbf{R}$, we propose a move $\mathbf{R}' \sim T(\cdot|\mathbf{R})$, where $T$ is a chosen transition kernel. The proposal is accepted with probability
 
 $$
-  A(\mathbf{R},\mathbf{R}') = \min\Set{1, \frac{|\Psi_T (\mathbf{R}', \alpha,\beta)|^2 T(\mathbf{R}|\mathbf{R}')}{|\Psi_T (\mathbf{R}, \alpha, \beta)|^2 T(\mathbf{R}' |\mathbf{R})}}
+  A(\mathbf{R},\mathbf{R}') = \min\Set{1, \frac{|\Psi_T (\mathbf{R}', \boldsymbol{\alpha})|^2 T(\mathbf{R}|\mathbf{R}')}{|\Psi_T (\mathbf{R}, \boldsymbol{\alpha})|^2 T(\mathbf{R}' |\mathbf{R})}}
 $$
 
 If the transition kernel is symmetric, i.e. $T(\mathbf{R}' | \mathbf{R}) = T(\mathbf{R}|\mathbf{R}')$, the acceptance probability simplifies to
 
 $$
-  A(\mathbf{R},\mathbf{R}') = \min\Set{1, \frac{|\Psi_T (\mathbf{R}', \alpha,\beta)|^2}{|\Psi_T (\mathbf{R}, \alpha, \beta)|^2}},
+  A(\mathbf{R},\mathbf{R}') = \min\Set{1, \frac{|\Psi_T (\mathbf{R}', \boldsymbol{\alpha})|^2}{|\Psi_T (\mathbf{R}, \boldsymbol{\alpha})|^2}},
 $$
 
 This special case corresponds to the original algorithm by [](article_metropolis_etal_1953), referred to as the *Metropolis algorithm*.
 
-Using this procedure to generate samples $\set{\mathbf{R}_k}_{k=1}^M$ \sim P_{\alpha,\beta}$, the expectation [](#equation:trial-wavefunction) approximates to the empirical mean
+Using this procedure to generate samples $\set{\mathbf{R}_k}_{k=1}^M \sim P_{\boldsymbol{\alpha}}$, the expectation [](#equation:trial-wavefunction) approximates to the empirical mean by the law of large numbers
 
 $$
 \label{equation:energy-estimation}
-  E(\alpha, \beta) \approx \frac{1}{M} \sum{k=1}^M E_L (\mathbf{R}^{(k)}, \alpha, \beta)
+  E(\boldsymbol{\alpha}) \approx \frac{1}{M} \sum_{k=1}^M E_L (\mathbf{R}^{(k)}; \boldsymbol{\alpha})
 $$
 
 The Metropolis algorithm using a symmetric transition kernel can be summarized as follows:
 
-Given parameters $(\alpha, \beta)$:
+Given parameters $\boldsymbol{\alpha}$:
 1. Initialize the configuration $\mathbf{R}^{(0)}$
 2. For $k = 0,\dots,M-1$:
     - Propose a new configurations $\mathbf{R}' \sim T(\cdot|\mathbf{R}^{(k)})$
     - Compute the acceptance ratio
 $$
-  A = \frac{|\Psi_T (\mathbf{R}', \alpha, \beta)|^2}{|\Psi_T (\mathbf{R}^{(k)}, \alpha, \beta)|^2}
+  A = \frac{|\Psi_T (\mathbf{R}', \boldsymbol{\alpha})|^2}{|\Psi_T (\mathbf{R}^{(k)}, \boldsymbol{\alpha})|^2}
 $$
 
     - Accept or reject:
@@ -351,9 +332,10 @@ $$
   \mathbf{F}(\mathbf{R}) = \frac{\nabla P(\mathbf{R})}{P(\mathbf{R})} = \nabla \ln[P(\mathbf{R})]
 $$
 
-with a probabiliy density of the form $P(\mathbf{R}) \propto |\Psi_T (\mathbf{R})|^2$, we obtain
+With a probabiliy density of the form $P(\mathbf{R}) \propto |\Psi_T (\mathbf{R})|^2$, we obtain
 
 $$
+\label{equation:quantum-force}
   \mathbf{F}(\mathbf{R}) = \nabla \ln[|\Psi_T (\mathbf{R})|^2] = 2 \frac{\nabla \Psi_T (\mathbf{R})}{\Psi_T (\mathbf{R})}
 $$
 
@@ -394,15 +376,92 @@ $$
   \frac{G(\mathbf{R}, \mathbf{R}', \Delta t)}{G(\mathbf{R}', \mathbf{R}, \Delta t)} = \exp\left[-\frac{1}{2} (\mathbf{F}' + \mathbf{F}) \cdot \left(\Delta\mathbf{R} + \frac{D\Delta t}{2} (\mathbf{F}' - \mathbf{F}) \right) \right],
 $$
 
+### Quantum Force
+
+From [](#equation:quantum-force) the quantum force acting on particle $i$ is given by the logarithmic gradient of the trial wavefunction
+
+$$
+  \mathbf{F}_i = 2 \nabla_i \ln[\Psi_T (\mathbf{R})] = \frac{2\nabla_i \Psi_T (\mathbf{R})}{\Psi_T (\mathbf{R})}
+$$
+
+#### Non-interacting case
+
+For non-interacting system in a spherical trap, the trial wavefunction factorizes as 
+
+$$
+  \Psi_T (\mathbf{R}) = \prod_{i=1}^N \phi(\mathbf{r}_i),\; \phi(\mathbf{r}) = e^{-\alpha r^2}
+$$
+
+Taking the gradient with respect to particle $i$ yields
+
+$$
+  \nabla_i \Psi_T (\mathbf{R}) = \left(\prod_{j\neq i} \phi(\mathbf{r}_j) \right) \nabla_i \phi(\mathbf{r}_i)
+$$
+
+Dividing by $\Psi_T$, we obtain the identity
+
+$$
+  \frac{\nabla_i \Psi_T (\mathbf{R})}{\Psi_T (\mathbf{R})} = \frac{\nabla_i \phi (\mathbf{r}_i)}{\phi (\mathbf{r}_i)}
+$$
+
+Using [](#equation:gaussian-factor-spherical-log-gradient), the quantum force therefore becomes
+
+$$
+  \mathbf{F}_i = -4\alpha \mathbf{r}_i,
+$$
+
+which is purely radial and directed toward the origin.
+
+#### Interacting case
+
+Using the analytic expression for the logarithmic gradient of $\Psi_T$ derived in [](#Logarithmic Gradient of the Trial Wavefunction), the quantum force in the interacting system becomes
+
+$$
+  \mathbf{F}_i = -4\alpha(x_i \unitvec{x} + y_i \unitvec{y} + \beta z_i \unitvec{z}) + 2a \sum_{j\neq k} \frac{\mathbf{r}_k - \mathbf{r}_j}{r_{kj}^2 (r_{kj} - a)}.
+$$
+
+The first term, corresponding to the single-particle elliptic confinement, is directed toward the origin as in the non-interacting case. In the isotropic limit $\beta = 1$, it reduces to the purely radial form $-4\alpha\mathbf{r}_i$. The second term, arising from the Jastrow factor, introduces repulsive particle interactions.
+
 ## Parameter Optimization
 
-The optimal variational parameters $(\alpha, \beta)$ can be obtained by minimizing the variational energy $E(\alpha, \beta)$. This a can be achieved by using the gradient $\nabla_{\alpha, \beta} E(\alpha, \beta)$ with respect to variational parameters as the objective for an optimization procedure. The energy derivatives can be written as
+The optimal variational parameters $\bar{\boldsymbol{\alpha}}$ can be obtained by minimizing the variational energy $E(\boldsymbol{\alpha})$. This can be achieved by using the gradient $\nabla_{\boldsymbol{\alpha}} E(\boldsymbol{\alpha})$ with respect to variational parameters as the objective for an optimization procedure. As shown in [](#Energy Derivative Formula), the energy derivative with respect to a parameter $\alpha_k$ can be written as
 
 $$
-  \frac{\partial E}{\partial\gamma} = 2 \left( \Braket{\frac{\partial_\gamma \Psi_T (\mathbf{R}; \alpha, \beta)}{\Psi_T (\mathbf{R}; \alpha, \beta)} E_L (\mathbf{R}; \alpha, \beta)} - \Braket{\frac{\partial_\gamma \Psi_T (\mathbf{R}; \alpha, \beta)}{\Psi_T (\mathbf{R}; \alpha, \beta)}} \braket{E_L (\mathbf{R}; \alpha, \beta)} \right)
+  \frac{\partial E}{\partial\alpha_k} = 2 \left( \Braket{\frac{\partial_{\alpha_k} \Psi_T (\mathbf{R}; \boldsymbol{\alpha})}{\Psi_T (\mathbf{R}; \boldsymbol{\alpha})} E_L (\mathbf{R}; \boldsymbol{\alpha})} - \Braket{\frac{\partial_{\alpha_k} \Psi_T (\mathbf{R}; \boldsymbol{\alpha})}{\Psi_T (\mathbf{R}; \boldsymbol{\alpha})}} \braket{E_L (\mathbf{R}; \boldsymbol{\alpha})} \right)
 $$
 
-where $\gamma = \alpha, \beta$.
+### Energy Derivatives
+
+#### Non-interacting Case
+
+In the non-interacting case with a spherical trap, the trial wavefunction depends only the parameter $\alpha$. The logarithmic derivative with respect to $\alpha$ is therfore
+
+$$
+  \frac{\partial_{\alpha} \Psi_T (\mathbf{R}; \alpha)}{\Psi_T (\boldsymbol{R}; \alpha)} = \frac{\partial}{\partial\alpha} \ln \left[\exp\left(-\alpha \sum_{i=1}^N r_i^2 \right) \right] = -\sum_{i=1}^N r_i^2
+$$
+
+#### Interacting case
+
+In the interacting case, the trial wavefunction depends on both the Gaussian confinement parameter $\alpha$ and the anisotrophy parameter $\beta$. The logarithmic derivative with respect to $\alpha$ is
+
+$$
+\begin{align*}
+  \frac{\partial_{\alpha} \Psi_T (\mathbf{R}; \alpha)}{\Psi_T (\boldsymbol{R}; \alpha)} =& \frac{\partial}{\partial\alpha} \ln\left[\exp\left(-\alpha \sum_{i=1}^N \left(x_i^2 + y_i^2 + \beta z_i^2 \right) \right) \prod_{j < k} f(a, r_{jk}) \right] \\
+  =& \frac{\partial}{\partial\alpha} \left[-\alpha \sum_{i=1}^N \left(x_i^2 + y_i^2 + \beta z_i^2 \right) + \sum_{j < k} \ln[f(a, r_{jk})] \right]
+\end{align*}
+$$
+
+Since the Jastrow correlation functions $f(a, r_{jk})$ are independent of $\alpha$, the second term vanishes under $\partial/\partial_\alpha$, resulting in 
+
+$$
+  \frac{\partial_{\alpha} \Psi_T (\mathbf{R}; \alpha)}{\Psi_T (\boldsymbol{R}; \alpha)} = -\sum_{i=1}^N \left(x_i^2 + y_i^2 + \beta z_i^2 \right)
+$$
+
+Similarly, the logarithmic derivative with respect to $\beta$ is
+
+$$
+  \frac{\partial_{\beta} \Psi_T (\mathbf{R}; \alpha)}{\Psi_T (\boldsymbol{R}; \alpha)} = -\alpha \sum_{i=1}^N z_i^2
+$$
 
 # Results
 
@@ -445,25 +504,19 @@ $$
 \end{align*}
 $$
 
-To obtain an analytic expression for $E_L$ in a $d$-dimensional system, we begin by computing the Laplacian $\nabla^2 \phi(\mathbf{r})$. Differentiating once gives
+To obtain an analytic expression for $E_L$ in a $d$-dimensional system, we compute the logarithmic Laplacian of $\phi(\mathbf{r})$. The logarithmic gradient of $\phi(\mathbf{r})$ is
 
 $$
-\label{equation:gradient}
-  \nabla \phi(\mathbf{r}) = -2\alpha\mathbf{r} e^{-\alpha r^2}.
+\label{equation:gaussian-factor-spherical-log-gradient}
+  \frac{\nabla \phi(\mathbf{r})}{\phi(\mathbf{r})} = \nabla \ln\left(e^{-\alpha r^2} \right) = -2\alpha\mathbf{r},
 $$
 
-Taking the divergence and applying the product rule 
-
-$$
-  \nabla\cdot [\mathbf{r} \phi(\mathbf{r})] = \phi(\mathbf{r}) \underbrace{\nabla \cdot \mathbf{r}}_{=d} + \mathbf{r} \cdot \nabla\phi(\mathbf{r}) = d\phi(\mathbf{r}) + \mathbf{r}\cdot\nabla\phi(\mathbf{r}),
-$$
-
-we obtain
+and the logarithmic Laplacian is
 
 $$
 \begin{align*}
-  \nabla_i \cdot (-2\alpha\mathbf{r} e^{-\alpha r^2}) =& -2d\alpha e^{-\alpha r^2} + 4\alpha^2 r^2 e^{-\alpha r^2} \\
-  =& e^{-\alpha r^2} (4\alpha^2 r^2 - 2d\alpha).
+  \frac{\nabla^2 \phi(\mathbf{r})}{\phi(\mathbf{r})} =& \nabla^2 (\ln[\phi(\mathbf{r}]) + |\nabla(\ln[\phi(\mathbf{r})])|^2 \\
+  =& -2\alpha \underbrace{\nabla\cdot\mathbf{r}}_{=d} + |-2\alpha \mathbf{r}|^2 = -2d\alpha + 4\alpha^2 r^2
 \end{align*}
 $$
 
@@ -483,24 +536,29 @@ $$
 \end{align*}
 $$
 
-## Local Energy in the Interacting Case
+## Logarithmic Gradient of the Trial Wavefunction
 
-To derive the logarithmic Laplacian [](#equation:trial-wavefunction-interacting-laplacian), we substitute
+To derive the logarithmic gradient of the trial wavefunction [](#equation:trial-wavefunction), we first rewrite it in the form
+
+$$
+\label{equation:trial-wavefunction-interacting}
+  \Psi_T (\mathbf{R}) = \left(\prod_{i=1}^N \phi(\mathbf{r}_k) \right) \exp\left(\sum_{j < k} u(r_{kj}) \right),\; r_{kj} = |\mathbf{r}_k - \mathbf{r}_j|
+$$
+
+where $\phi(\mathbf{r}_k) = g(\alpha,\beta,\mathbf{r}_i)$ are the Gaussian single-particle factors, and $u(r_{kj}) = \ln[f(r_{kj})]$ are the logarithmic Jastrow correlation factors. Introduing the shorthand,
 
 $$
   A(\mathbf{R}) = \prod_{i=1}^N \phi(\mathbf{r}_i),\quad B(\mathbf{R}) = \exp\left(\sum_{j < k} u(r_{jk}) \right), 
 $$
 
-such that $\Psi_T$ in [](#equation:trial-wavefunction-interacting) can be factored as
+we can factor $\Psi_T$ neatly as
 
 $$
 \label{equation:trial-wavefunction-refactor}
   \Psi_T (\mathbf{R}) = A(\mathbf{R}) B(\mathbf{R})
 $$
 
-### Logarithmic Gradient of $\Psi_T$
-
-Taking the gradient of [](#equation:trial-wavefunction-refactor) and appling the product rule yields
+Taking the gradient and applying the product rule yields
 
 $$
   \nabla_k \Psi_T  = (\nabla_k A) B + A \nabla_k B
@@ -527,13 +585,21 @@ $$
 \end{align*}
 $$
 
-Factoring out $\Psi_T$, we arrive at
+Factoring out $\Psi_T$, the logarithmic gradient can be written as
 
 $$
-  \frac{\nabla_k \Psi_T (\mathbf{R})}{\Psi_T (\mathbf{R})} = \frac{\nabla_k \phi(\mathbf{r}_k)}{\phi(\mathbf{r}_k)} + \sum_{l\neq k} \nabla_k u(r_{kl})
+\label{equation:wavefunction-log-gradient}
+  \frac{\nabla_k \Psi_T (\mathbf{R})}{\Psi_T (\mathbf{R})} = \frac{\nabla_k \phi(\mathbf{r}_k)}{\phi(\mathbf{r}_k)} + \sum_{j\neq k} \nabla_k u(r_{kj})
 $$
 
-To evaluate $\nabla_k u(r_{kj})$, we apply the chain rule, giving $\nabla_k u(r_{kj}) = u' (r_{kj}) \nabla_k r_kj$. Introducing $\mathbf{r} := \mathbf{r}_k - \mathbf{r}_j$, such that $r_{kj} = |\mathbf{r}|$, we get
+To derive an analytical expression, we first calculate the logarithmic gradient of $\phi(\mathbf{r})$, given by
+
+$$
+\label{equation:gaussian-factor-log-gradient}
+  \frac{\nabla \phi(\mathbf{r})}{\phi(\mathbf{r})} = \nabla \ln\left(\exp[-\alpha(x_i^2 + y_i^2 + \beta z_i^2)] \right) = -2\alpha(x \unitvec{x} + y \unitvec{y} + \beta z \unitvec{z})
+$$
+
+To evaluate $\nabla_k u(r_{kj})$, we apply the chain rule, yielding $\nabla_k u(r_{kj}) = u' (r_{kj}) \nabla_k r_{kj}$. Introducing $\mathbf{r} := \mathbf{r}_k - \mathbf{r}_j$, such that $r_{kj} = |\mathbf{r}|$, we get
 
 $$
   \nabla_k r_{kj} = \nabla_k (\mathbf{r} \cdot \mathbf{r})^{1/2} = \frac{1}{2} (\mathbf{r}\cdot\mathbf{r})^{-1/2} \nabla_k (\mathbf{r}\cdot\mathbf{r})
@@ -548,16 +614,30 @@ $$
 we obtain
 
 $$
-  \nabla_k r_{jk} = \frac{1}{2}\frac{1}{|\mathbf{r}|}2\mathbf{r} = \frac{\mathbf{r}}{|\mathbf{r}|} = \frac{\mathbf{r}_k - \mathbf{r}_j}{r_{kj}}
+  \nabla_k r_{kj} = \frac{1}{2}\frac{1}{|\mathbf{r}|}2\mathbf{r} = \frac{\mathbf{r}}{|\mathbf{r}|} = \frac{\mathbf{r}_k - \mathbf{r}_j}{r_{kj}}
 $$
 
-Hence
+Hence,
 
 $$
-  \nabla_k u(r_{jk}) = u'(r_{kj}) \frac{\mathbf{r}_k - \mathbf{r}_j}{r_{kj}}
+  \nabla_k u(r_{jk}) = u'(r_{kj}) \frac{\mathbf{r}_k - \mathbf{r}_j}{r_{kj}}.
 $$
 
-### Logarithmic Laplacian of $\Psi_T$
+Derivating $u(r)$, we get for $a > -1$
+
+$$
+\label{equation:jastrow-first-derivative}
+  u'(r) = \frac{\drm}{\drm r} \ln[f(a, r)] = \frac{\drm}{\drm r} \ln\left(1 - \frac{a}{r} \right) = \frac{a}{r^2} \frac{1}{1 - a/r} = \frac{a}{r^2 - ar}
+$$
+
+Substituting this and [](#equation:gaussian-factor-log-gradient) into [](#equation:wavefunction-log-gradient), leads to
+
+$$
+\label{equation:wavefunction-log-gradient-analytic}
+  \frac{\nabla_k \Psi_T (\mathbf{R})}{\Psi_T (\mathbf{R})} = -2\alpha(x_k \unitvec{x} + y_k \unitvec{y} + \beta z_k \unitvec{z}) + a \sum_{j\neq k} \frac{\mathbf{r}_k - \mathbf{r}_j}{r_{kj}^2 (r_{kj} - a)}
+$$
+
+## Logarithmic Laplacian of the Trial Wavefunction
 
 To derive the logarithmic Laplacian of $\Psi_T$, we define
 
@@ -678,13 +758,7 @@ $$
 \end{split}
 $$
 
-To obtained a closed analytical form of this expression, we compute the logarithmic gradient and Laplacian of $\phi$. The logarithmic gradient of $\phi$ is given by
-
-$$
-  \frac{\nabla \phi(\mathbf{r})}{\phi(\mathbf{r})} = \nabla \ln[\phi(\mathbf{r})] = -2\alpha(x \unitvec{x} + y \unitvec{y} + \beta z \unitvec{z}), \mathbf{r} = (x, y, z) \in \R^3
-$$
-
-and the logarithmic Laplacian of $\phi$ is given by
+To obtained a closed analytical form of this expression, we compute the logarithmic gradient and Laplacian of $\phi$. The logarithmic Laplacian of $\phi$ is given by
 
 $$
 \begin{align*}
@@ -693,13 +767,7 @@ $$
 \end{align*}
 $$
 
-Furthermore, we have for $a > 0$
-
-$$
-  u'(r) = \frac{\drm}{\drm r} \ln[f(a, r)] = \frac{\drm}{\drm r} \ln\left(1 - \frac{1}{r} \right) = \frac{a}{r^2} \frac{1}{1 - a/r} = \frac{a}{r^2 - ar}
-$$
-
-and with $g(r) = r^2 - ar$ and $g'(r) = 2r - a$
+Furthermore, with $g(r) = r^2 - ar$ and $g'(r) = 2r - a$
 
 $$
   u''(r) = -a\frac{g'(r)}{g(r)^2} = \frac{a^2 - 2ar}{(r^2 - ar)^2}
@@ -716,42 +784,42 @@ $$
 \end{align*}
 $$
 
-## Energy Derivatives
+## Energy Derivative Formula
 
-To derive the expression for the energy derivatives [](#equation:energy-derivative), we apply the quotient rule to $E(\alpha, \beta) = N/D$ defined in [](#equation:hamiltonian-expectation). This gives
+To derive the formula for the energy derivative [](#equation:energy-derivative) with respect to a parameter $\alpha_k$, we apply the quotient rule to $E(\boldsymbol{\alpha}) = N/D$ defined in [](#equation:hamiltonian-expectation). This gives
 
 $$
 \label{equation:quotient-rule}
-  \frac{\partial E(\alpha, \beta)}{\partial\gamma} = \frac{(\partial_\gamma N) D - N(\partial_\gamma D)}{D^2} = \frac{(\partial_\gamma N)}{D} E(\alpha, \beta) \frac{\partial_\gamma D}{D},
+  \frac{\partial E(\boldsymbol{\alpha})}{\partial\alpha_k} = \frac{(\partial_{\alpha_k} N) D - N(\partial_{\alpha_k} D)}{D^2} = \frac{(\partial_{\alpha_k} N)}{D} - E(\boldsymbol{\alpha}) \frac{\partial_{\alpha_k} D}{D},
 $$
 
-where $\gamma = \alpha, \beta$. The numerator partial derivative is
+The numerator partial derivative is
 
 $$
 \begin{align*}
-  \partial_\gamma N =& \frac{\partial}{\partial\gamma} \int_{\R^{3N}} \Psi(\mathbf{R}; \alpha, \beta) \hat{H}\Psi_T (\mathbf{R}; \alpha, \beta) \;\drm \mathbf{R} \\
-  =& \int [(\partial_\gamma \Psi_T) \hat{H}\Psi_T + \Psi_T \hat{H} (\partial_\gamma \Psi_T)] \;\drm\mathbf{R}
+  \partial_{\alpha_k} N =& \frac{\partial}{\partial\alpha_k} \int_{\R^{3N}} \Psi_T(\mathbf{R}; \boldsymbol{\alpha}) \hat{H}\Psi_T (\mathbf{R}; \boldsymbol{\alpha}) \;\drm \mathbf{R} \\
+  =& \int [(\partial_{\alpha_k} \Psi_T) \hat{H}\Psi_T + \Psi_T \hat{H} (\partial_{\alpha_k} \Psi_T)] \;\drm\mathbf{R}
 \end{align*}
 $$
 
 Since $\hat{H}$ is Hermitian, we get
 
 $$
-  \int \Psi_T \hat{H} (\partial_\gamma \Psi_T) \;\drm\mathbf{R} = \int (\partial_\gamma \Psi_T) \hat{H} \Psi_T \;\drm\mathbf{R}
+  \int \Psi_T \hat{H} (\partial_{\alpha_k} \Psi_T) \;\drm\mathbf{R} = \int (\partial_{\alpha_k} \Psi_T) \hat{H} \Psi_T \;\drm\mathbf{R}
 $$
 
 Substituting the local energy $E_L$ defined in [](#equation:local-energy) results in
 
 $$
-  \partial_\gamma N = 2 \int (\partial_\gamma \Psi_T) \hat{H} \Psi_T \;\d\mathbf{R} = 2 \int |\Psi_T|^2 \left(\frac{\partial_\gamma \Psi_T}{\Psi_T} \right) E_L
+  \partial_{\alpha_k} N = 2 \int (\partial_{\alpha_k} \Psi_T) \hat{H} \Psi_T \;\drm \mathbf{R} = 2 \int |\Psi_T|^2 \left(\frac{\partial_{\alpha_k} \Psi_T}{\Psi_T} \right) E_L \;\drm\mathbf{R}
 $$
 
 The denominator derivative is
 
 $$
 \begin{align*}
-  \partial_\gamma D =& \frac{\partial}{\partial\gamma} \int_{\R^{3N}} |\Psi_T (\mathbf{R}; \alpha, \beta)|^2 \;\drm\mathbf{R} \\
-  =& 2 \int \Psi_T (\partial_\gamma \Psi_T) \;\drm\mathbf{R} = 2 \int |\Psi_T|^2 \left(\frac{\partial_\gamma \Psi_T}{\Psi_T} \right)
+  \partial_{\alpha_k} D =& \frac{\partial}{\partial\alpha_k} \int_{\R^{3N}} |\Psi_T (\mathbf{R}; \boldsymbol{\alpha})|^2 \;\drm\mathbf{R} \\
+  =& 2 \int \Psi_T (\partial_{\alpha_k} \Psi_T) \;\drm\mathbf{R} = 2 \int |\Psi_T|^2 \left(\frac{\partial_{\alpha_k} \Psi_T}{\Psi_T} \right)
 \end{align*}
 $$
 
@@ -759,25 +827,25 @@ Inserting into the quotient rule [](#equation:quotient-rule) yields
 
 $$
 \begin{align*}
-  \frac{\partial E}{\partial\gamma} =& 2 \int \left(\frac{|\Psi_T|^2}{\int |\Psi_T|^2 \;\drm\mathbf{R}}\right) \left(\frac{\partial_\gamma \Psi_T}{\Psi_T} \right) E_L \;\drm\mathbf{R} \\
-  &- 2 E(\alpha, \beta) \int \left(\frac{|\Psi_T|^2}{\int |\Psi_T|^2 \;\drm \mathbf{R}} \right) \left(\frac{\partial_\gamma \Psi_T}{\Psi_T} \right) \;\drm\mathbf{R}
+  \frac{\partial E}{\partial\alpha_k} =& 2 \int \left(\frac{|\Psi_T|^2}{\int |\Psi_T|^2 \;\drm\mathbf{R}}\right) \left(\frac{\partial_{\alpha_k} \Psi_T}{\Psi_T} \right) E_L \;\drm\mathbf{R} \\
+  &- 2 E(\boldsymbol{\alpha}) \int \left(\frac{|\Psi_T|^2}{\int |\Psi_T|^2 \;\drm \mathbf{R}} \right) \left(\frac{\partial_{\alpha_k} \Psi_T}{\Psi_T} \right) \;\drm\mathbf{R}
 \end{align*}
 $$
 
 Inserting the probability density $P_{\alpha,\beta}$ defined in [](#equation:wavefunction-pdf), we identify the expectation values
 
 $$
-  \Braket{\frac{\partial_\gamma \Psi_T}{\Psi_T} E_L} = \int P_{\alpha, \beta} (\mathbf{R}) \left(\frac{\partial_\gamma \Psi_T (\mathbf{R}; \alpha, \beta)}{\Psi_T (\mathbf{R}; \alpha, \beta)} \right) E_L (\mathbf{R}; \alpha, \beta) \;\drm\mathbf{R}
+  \Braket{\frac{\partial_{\alpha_k} \Psi_T}{\Psi_T} E_L} = \int P_{\boldsymbol{\alpha}} (\mathbf{R}) \left(\frac{\partial_\gamma \Psi_T (\mathbf{R}; \boldsymbol{\alpha})}{\Psi_T (\mathbf{R}; \boldsymbol{\alpha})} \right) E_L (\mathbf{R}; \boldsymbol{\alpha}) \;\drm\mathbf{R}
 $$
 
 and
 
 $$
-  \Braket{\frac{\partial_\gamma \Psi_T}{\Psi_T}} = \int P_{\alpha, \beta} (\mathbf{R}) \left(\frac{\partial_\gamma \Psi_T (\mathbf{R}; \alpha, \beta)}{\Psi_T (\mathbf{R}; \alpha, \beta)} \right) \;\drm\mathbf{R}
+  \Braket{\frac{\partial_{\alpha_k} \Psi_T}{\Psi_T}} = \int P_{\boldsymbol{\alpha}} (\mathbf{R}) \left(\frac{\partial_{\alpha_k} \Psi_T (\mathbf{R}; \boldsymbol{\alpha})}{\Psi_T (\mathbf{R}; \boldsymbol{\alpha})} \right) \;\drm\mathbf{R}
 $$
 
-Also, since $E(\alpha, \beta) = \braket{E_L}$ as defined in [](#equation:variation-energy-expectation), we finally arrive at
+Also, since $E(\boldsymbol{\alpha}) = \braket{E_L}$ as defined in [](#equation:variation-energy-expectation), we finally arrive at
 
 $$
-  \frac{\partial E}{\partial\gamma} = 2\left(\Braket{\frac{\partial_\gamma \Psi_T}{\Psi_T} E_L} - \Braket{\frac{\partial_\gamma}{\Psi_T}} \braket{E_L} \right)
+  \frac{\partial E}{\partial\alpha_k} = 2\left(\Braket{\frac{\partial_{\alpha_k} \Psi_T}{\Psi_T} E_L} - \Braket{\frac{\partial_{\alpha_k}}{\Psi_T}} \braket{E_L} \right)
 $$
