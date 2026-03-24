@@ -4,7 +4,7 @@ import numpy as np
 from numba import njit, prange
 from numpy.typing import NDArray
 from stats import seed_numba
-from structs import ParameterGrid, ParamConstructor
+from structs import ParameterGrid
 
 type ScalarFunction[P: NamedTuple] = Callable[[NDArray[np.floating], P], float]
 type VectorFunction[P: NamedTuple] = Callable[
@@ -14,9 +14,9 @@ type VectorFunction[P: NamedTuple] = Callable[
 
 class GridSearchResult[P: NamedTuple](NamedTuple):
   params: list[P]
-  energy: NDArray[np.floating]
-  variance: NDArray[np.floating]
-  error: NDArray[np.floating]
+  energies: NDArray[np.floating]
+  variances: NDArray[np.floating]
+  errors: NDArray[np.floating]
 
 
 @njit(fastmath=True)
@@ -28,7 +28,7 @@ def metropolis_step_numba[P: NamedTuple](
   cycles: int,
   number_particles: int,
   dimension: int,
-) -> tuple[float, NDArray[np.floating]]:
+) -> tuple[float, float, NDArray[np.floating]]:
   """
   Perform a single Metropolis Monte Carlo step. JIT-compiled using numba
 
@@ -59,13 +59,15 @@ def metropolis_step_numba[P: NamedTuple](
   positions = np.zeros((number_particles, dimension), dtype=np.float64)
   for i in range(number_particles):
     for j in range(dimension):
-      positions[i, j] = step_size * (np.random.randn() - 0.5)
+      positions[i, j] = step_size * (np.random.rand() - 0.5)
 
   row_store = np.empty(dimension, dtype=np.float64)
 
   wf_old = wavefunction(positions, parameters)
 
+  # Initialize output variables
   energy = 0.0
+  energy2 = 0.0
   energies = np.empty(cycles, dtype=np.float64)
 
   # Perform Monte Carlo cycles
@@ -92,11 +94,13 @@ def metropolis_step_numba[P: NamedTuple](
     # Calculate energy
     energy_delta = local_energy(positions, parameters)
     energy += energy_delta
+    energy2 += energy_delta**2
     energies[cycle] = energy / (cycle + 1)
 
   energy /= cycles
+  energy2 /= cycles
 
-  return energy, energies
+  return energy, energy2, energies
 
 
 @njit(fastmath=True)
@@ -110,7 +114,7 @@ def metropolis_step_importance_numba[P: NamedTuple](
   cycles: int,
   number_particles: int,
   dimension: int,
-) -> tuple[float, NDArray[np.floating]]:
+) -> tuple[float, float, NDArray[np.floating]]:
   """
   Perform a single Metropolis Monte Carlo step using Langevin dynamics. JIT-compiled using numba
 
@@ -158,6 +162,7 @@ def metropolis_step_importance_numba[P: NamedTuple](
   wf_old = wavefunction(positions, parameters)
 
   energy = 0.0
+  energy2 = 0.0
   energies = np.empty(cycles, dtype=np.float64)
 
   # Perform Monte Carlo cycles
@@ -199,11 +204,13 @@ def metropolis_step_importance_numba[P: NamedTuple](
     # Calculate energy
     energy_delta = local_energy(positions, parameters)
     energy += energy_delta
+    energy2 += energy_delta**2
     energies[cycle] = energy / (cycle + 1)
 
   energy /= cycles
+  energy2 /= cycles
 
-  return energy, energies
+  return energy, energy2, energies
 
 
 @njit(fastmath=True)
@@ -296,26 +303,23 @@ def metropolis_step_optimization_numba[P: NamedTuple](
 def run_grid_search_numba[P: NamedTuple](
   wavefunction: ScalarFunction[P],
   local_energy: ScalarFunction[P],
-  param_matrix: NDArray[np.floating],
-  param_type: ParamConstructor[P],
+  params_list: tuple[P, ...],
   step_size: float,
   cycles: int,
   number_particles: int,
   dimension: int,
 ):
 
-  iterations = param_matrix.shape[0]
+  iterations = len(params_list)
   energies = np.empty(iterations)
   variances = np.empty(iterations)
+  errors = np.empty(iterations)
 
   for i in prange(iterations):
-    row = param_matrix[i]
-    parameters = construct_params(param_type, row)
-
-    energy, energy_store = metropolis_step_numba(
+    energy, energy2, _ = metropolis_step_numba(
       wavefunction,
       local_energy,
-      parameters,
+      params_list[i],
       step_size,
       cycles,
       number_particles,
@@ -323,9 +327,50 @@ def run_grid_search_numba[P: NamedTuple](
     )
 
     energies[i] = energy
-    variances[i] = np.var(energy_store)
+    var = energy2 - energy**2
+    variances[i] = var
+    errors[i] = np.sqrt(np.abs(var) / cycles)
 
-  return energies, variances
+  return energies, variances, errors
+
+
+@njit(parallel=True)
+def run_grid_search_importance_numba[P: NamedTuple](
+  wavefunction: ScalarFunction[P],
+  local_energy: ScalarFunction[P],
+  drift_force: VectorFunction[P],
+  params_list: tuple[P, ...],
+  time_step: float,
+  diffusion_coefficient: float,
+  cycles: int,
+  number_particles: int,
+  dimension: int,
+):
+
+  iterations = len(params_list)
+  energies = np.empty(iterations)
+  variances = np.empty(iterations)
+  errors = np.empty(iterations)
+
+  for i in prange(iterations):
+    energy, energy2, _ = metropolis_step_importance_numba(
+      wavefunction,
+      local_energy,
+      drift_force,
+      params_list[i],
+      time_step,
+      diffusion_coefficient,
+      cycles,
+      number_particles,
+      dimension,
+    )
+
+    energies[i] = energy
+    var = energy2 - energy**2
+    variances[i] = var
+    errors[i] = np.sqrt(np.abs(var) / cycles)
+
+  return energies, variances, errors
 
 
 class Metropolis[P: NamedTuple]:
@@ -355,7 +400,7 @@ class Metropolis[P: NamedTuple]:
     time_step: float,
     diffusion_coefficient: float,
     cycles: int,
-  ) -> tuple[float, NDArray[np.floating]]:
+  ) -> tuple[float, float, NDArray[np.floating]]:
     return metropolis_step_importance_numba(
       wavefunction,
       local_energy,
@@ -366,28 +411,6 @@ class Metropolis[P: NamedTuple]:
       cycles,
       self.number_particles,
       self.dimension,
-    )
-
-  def _grid_search[PG: ParameterGrid[P]](
-    self,
-    parameter_grid: PG,
-    cycles: int,
-    metropolis_step: Callable[[P], tuple[float, NDArray[np.floating]]],
-  ) -> GridSearchResult[P]:
-    params_list = parameter_grid.combos()
-
-    energies_, energy_stores_ = zip(*(metropolis_step(p) for p in params_list))
-    energies = np.array(energies_)
-    energy_stores = np.vstack(energy_stores_)
-    energies_squared = np.mean(energy_stores**2, axis=1)
-    variances = energies_squared - energies**2
-    error = np.sqrt(np.abs(variances) / cycles)
-
-    return GridSearchResult(
-      params=params_list,
-      energy=energies,
-      variance=variances,
-      error=error,
     )
 
   def grid_search_brute[PG: ParameterGrid[P]](
@@ -417,24 +440,30 @@ class Metropolis[P: NamedTuple]:
 
     Returns
     -------
-    results : list[GridSearchResult[P]]
+    list[GridSearchResult[P]]
       List of results containing the parameters, energy, variance, and error.
     """
 
     seed_numba(seed)
 
-    def metropolis_step(parameters: P) -> tuple[float, NDArray[np.floating]]:
-      return metropolis_step_numba(
-        wavefunction,
-        local_energy,
-        parameters,
-        step_size,
-        cycles,
-        self.number_particles,
-        self.dimension,
-      )
+    params_list = parameter_grid.combos_numba()
 
-    return self._grid_search(parameter_grid, cycles, metropolis_step)
+    energies, variances, errors = run_grid_search_numba(
+      wavefunction,
+      local_energy,
+      params_list,
+      step_size,
+      cycles,
+      self.number_particles,
+      self.dimension,
+    )
+
+    return GridSearchResult(
+      params=params_list,
+      energies=energies,
+      variances=variances,
+      errors=errors,
+    )
 
   def grid_search_importance[PG: ParameterGrid[P]](
     self,
@@ -475,20 +504,26 @@ class Metropolis[P: NamedTuple]:
 
     seed_numba(seed)
 
-    def metropolis_step(parameters: P) -> tuple[float, NDArray[np.floating]]:
-      return metropolis_step_importance_numba(
-        wavefunction,
-        local_energy,
-        drift_force,
-        parameters,
-        time_step,
-        diffusion_coefficient,
-        cycles,
-        self.number_particles,
-        self.dimension,
-      )
+    params_list = parameter_grid.combos_numba()
 
-    return self._grid_search(parameter_grid, cycles, metropolis_step)
+    energies, variances, errors = run_grid_search_importance_numba(
+      wavefunction,
+      local_energy,
+      drift_force,
+      params_list,
+      time_step,
+      diffusion_coefficient,
+      cycles,
+      self.number_particles,
+      self.dimension,
+    )
+
+    return GridSearchResult(
+      params=params_list,
+      energies=energies,
+      variances=variances,
+      errors=errors,
+    )
 
   def optimize(
     self,

@@ -1,10 +1,10 @@
-from typing import NamedTuple
 from dataclasses import dataclass
+from typing import NamedTuple
 
-from numba import njit
 import numpy as np
+from numba import njit, prange
 from numpy.typing import NDArray
-from structs import ParameterGrid, ParamConstructor
+from structs import ParamConstructor, ParameterGrid
 
 
 class BoseParams(NamedTuple):
@@ -48,6 +48,20 @@ def wavefunction(positions: NDArray[np.floating], params: BoseParams):
 
 
 @njit(fastmath=True)
+def wavefunction_derivative(positions: NDArray[np.floating], params: BoseParams):
+  _, beta, _, _ = params
+
+  alpha_derivative = -np.sum(
+    positions[:, 0] ** 2 + positions[:, 1] ** 2 + beta * positions[:, 2] ** 2
+  )
+  beta_derivative = 0
+  gamma_derivative = 0
+  a_derivative = 0
+
+  return alpha_derivative, beta_derivative, gamma_derivative, a_derivative
+
+
+@njit(fastmath=True)
 def local_energy(positions: NDArray[np.floating], params: BoseParams):
   alpha, beta, gamma, a = params
   n = positions.shape[0]
@@ -75,26 +89,18 @@ def local_energy(positions: NDArray[np.floating], params: BoseParams):
     u_vec[1] = 0.0
     u_vec[2] = 0.0
 
-    x = positions[i, 0]
-    y = positions[i, 1]
-    z = positions[i, 2]
+    r2 = xi * xi + yi * yi + beta2 * zi * zi
+    single_particle_term += -2.0 * alpha * (2.0 + beta) + 4.0 * alpha2 * r2
 
-    r2_gauss = x * x + y * y + beta2 * z * z
-    single_particle_term += -2.0 * alpha * (2.0 + beta) + 4.0 * alpha2 * r2_gauss
-
-    elliptic_trap += x * x + y * y + gamma2 * z * z
+    elliptic_trap += xi * xi + yi * yi + gamma2 * zi * zi
 
     for j in range(n):
       if i == j:
         continue
 
-      xj = positions[j, 0]
-      yj = positions[j, 1]
-      zj = positions[j, 2]
-
-      dx = xi - xj
-      dy = yi - yj
-      dz = zi - zj
+      dx = xi - positions[j, 0]
+      dy = yi - positions[j, 1]
+      dz = zi - positions[j, 2]
 
       rij2 = dx * dx + dy * dy + dz * dz
       rij = np.sqrt(rij2)
@@ -118,7 +124,7 @@ def local_energy(positions: NDArray[np.floating], params: BoseParams):
       u_vec[1] += dy * inv
       u_vec[2] += dz * inv
 
-    # term_3 = sum_i ||sum_j u_ij||^2
+    # term_3 = sum_i |sum_j u_ij|^2
     term_3 += u_vec[0] * u_vec[0] + u_vec[1] * u_vec[1] + u_vec[2] * u_vec[2]
 
   log_laplacian = (
@@ -130,65 +136,42 @@ def local_energy(positions: NDArray[np.floating], params: BoseParams):
 
 
 @njit(fastmath=True)
-def local_energy_(positions: NDArray[np.floating], params: BoseParams):
-  alpha, beta, gamma, a = params
-  n = positions.shape[0]
+def drift_force(positions: NDArray[np.floating], params: BoseParams):
+  alpha, beta, _, a = params
+  num_particles = positions.shape[0]
 
-  alpha2 = alpha**2
-  beta2 = beta**2
-  gamma2 = gamma**2
-  a2 = a**2
+  forces = np.zeros((num_particles, 3))
 
-  single_particle_term = np.sum(
-    -2.0 * alpha * (2.0 + beta)
-    + 4.0
-    * alpha2
-    * (positions[:, 0] ** 2 + positions[:, 1] ** 2 + beta2 * positions[:, 2] ** 2)
-  )
+  for i in range(num_particles):
+    xi = positions[i, 0]
+    yi = positions[i, 1]
+    zi = positions[i, 2]
 
-  term_2 = 0.0
-  term_3 = 0.0
-  term_4 = 0.0
+    # External force
+    forces[i, 0] = -4 * alpha * xi
+    forces[i, 1] = -4 * alpha * yi
+    forces[i, 2] = -4 * alpha * beta * zi
 
-  u_vec = np.empty(3, dtype=np.float64)
-  for i in range(n):
-    u_vec[0] = 0.0
-    u_vec[1] = 0.0
-    u_vec[2] = 0.0
-
-    for j in range(n):
+    # Repulsive force
+    for j in range(num_particles):
       if i == j:
         continue
 
-      rij_vec = positions[i] - positions[j]
-      rij = np.linalg.norm(rij_vec)
+      dx = xi - positions[j, 0]
+      dy = yi - positions[j, 1]
+      dz = zi - positions[j, 2]
+
+      rij2 = dx * dx + dy * dy + dz * dz
+      rij = np.sqrt(rij2)
+
+      # Hard-core condition
       if rij <= a:
-        return np.inf
+        return np.zeros((num_particles, 3))
 
-      rij2 = rij**2
-      inv_dist = 1.0 / (rij2 * (rij - a))
+      inv = 1.0 / (rij2 * (rij - a))
 
-      nominator_2 = (
-        rij_vec[0] * positions[i, 0]
-        + rij_vec[1] * positions[i, 1]
-        + beta * rij_vec[2] * positions[i, 2]
-      )
-      term_2 += nominator_2 * inv_dist
+      forces[i, 0] += 2 * a * dx * inv
+      forces[i, 1] += 2 * a * dy * inv
+      forces[i, 2] += 2 * a * dz * inv
 
-      term_4 += 1.0 / (rij2 * (rij - a) ** 2)
-
-      u_vec += rij_vec * inv_dist
-
-    term_3 += np.dot(u_vec, u_vec)
-
-  log_laplacian = (
-    single_particle_term - 4.0 * alpha * a * term_2 + a2 * (term_3 - term_4)
-  )
-
-  elliptic_trap = np.sum(
-    positions[:, 0] ** 2 + positions[:, 1] ** 2 + gamma2 * positions[:, 2] ** 2
-  )
-
-  energy = 0.5 * (-log_laplacian + elliptic_trap)
-
-  return energy
+  return forces

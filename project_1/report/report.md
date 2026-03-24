@@ -412,7 +412,7 @@ $$
 
 which is purely radial and directed toward the origin.
 
-#### Interacting case
+#### Interacting Case
 
 Using the analytic expression for the logarithmic gradient of $\Psi_T$ derived in [](#Logarithmic Gradient of the Trial Wavefunction), the quantum force in the interacting system becomes
 
@@ -434,19 +434,19 @@ $$
 
 #### Non-interacting Case
 
-In the non-interacting case with a spherical trap, the trial wavefunction depends only the parameter $\alpha$. The logarithmic derivative with respect to $\alpha$ is therfore
+In the non-interacting case with a spherical trap, the trial wavefunction depends only on the Gaussian confinement parameter $\alpha$. The logarithmic derivative with respect to $\alpha$ is therfore
 
 $$
   \frac{\partial_{\alpha} \Psi_T (\mathbf{R}; \alpha)}{\Psi_T (\boldsymbol{R}; \alpha)} = \frac{\partial}{\partial\alpha} \ln \left[\exp\left(-\alpha \sum_{i=1}^N r_i^2 \right) \right] = -\sum_{i=1}^N r_i^2
 $$
 
-#### Interacting case
+#### Interacting Case
 
-In the interacting case, the trial wavefunction depends on both the Gaussian confinement parameter $\alpha$ and the anisotrophy parameter $\beta$. The logarithmic derivative with respect to $\alpha$ is
+In the interacting case, the trial wavefunction also depends on the anisotrophy parameter $\beta$, in addition to $\alpha$. The logarithmic derivative with respect to $\alpha$ is
 
 $$
 \begin{align*}
-  \frac{\partial_{\alpha} \Psi_T (\mathbf{R}; \alpha)}{\Psi_T (\boldsymbol{R}; \alpha)} =& \frac{\partial}{\partial\alpha} \ln\left[\exp\left(-\alpha \sum_{i=1}^N \left(x_i^2 + y_i^2 + \beta z_i^2 \right) \right) \prod_{j < k} f(a, r_{jk}) \right] \\
+  \frac{\partial_{\alpha} \Psi_T (\mathbf{R}; \alpha, \beta)}{\Psi_T (\boldsymbol{R}; \alpha)} =& \frac{\partial}{\partial\alpha} \ln\left[\exp\left(-\alpha \sum_{i=1}^N \left(x_i^2 + y_i^2 + \beta z_i^2 \right) \right) \prod_{j < k} f(a, r_{jk}) \right] \\
   =& \frac{\partial}{\partial\alpha} \left[-\alpha \sum_{i=1}^N \left(x_i^2 + y_i^2 + \beta z_i^2 \right) + \sum_{j < k} \ln[f(a, r_{jk})] \right]
 \end{align*}
 $$
@@ -460,7 +460,7 @@ $$
 Similarly, the logarithmic derivative with respect to $\beta$ is
 
 $$
-  \frac{\partial_{\beta} \Psi_T (\mathbf{R}; \alpha)}{\Psi_T (\boldsymbol{R}; \alpha)} = -\alpha \sum_{i=1}^N z_i^2
+  \frac{\partial_{\beta} \Psi_T (\mathbf{R}; \alpha, \beta)}{\Psi_T (\boldsymbol{R}; \alpha)} = -\alpha \sum_{i=1}^N z_i^2
 $$
 
 # Results
@@ -758,7 +758,7 @@ $$
 \end{split}
 $$
 
-To obtained a closed analytical form of this expression, we compute the logarithmic gradient and Laplacian of $\phi$. The logarithmic Laplacian of $\phi$ is given by
+To obtained a closed analytical form of this expression, we compute the logarithmic gradient and Laplacian of $\phi$. Applying [](#equation:gaussian-factor-log-gradient), we find
 
 $$
 \begin{align*}
@@ -767,13 +767,13 @@ $$
 \end{align*}
 $$
 
-Furthermore, with $g(r) = r^2 - ar$ and $g'(r) = 2r - a$
+Using [](#equation:jastrow-first-derivative), with $g(r) = r^2 - ar$ and $g'(r) = 2r - a$, the second derivative of the logarithmic Jastrow factor becomes
 
 $$
   u''(r) = -a\frac{g'(r)}{g(r)^2} = \frac{a^2 - 2ar}{(r^2 - ar)^2}
 $$
 
-Inserting the calculated derivatives into [](#equation:wavefunction-logarithmic-laplacian) and simplifying, we arrived at
+Inserting the calculated derivatives into [](#equation:wavefunction-logarithmic-laplacian) and simplifying, we finally arrive at
 
 $$
 \begin{align*}

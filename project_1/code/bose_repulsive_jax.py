@@ -43,10 +43,23 @@ def wavefunction_jax(positions: Array, params: BoseParams) -> Array:
   return psi
 
 
+def wavefunction_derivative_jax(positions: Array, params: BoseParams) -> BoseParams:
+  _, beta, _, _ = params
+
+  alpha_derivative = -jnp.sum(
+    positions[:, 0] ** 2 + positions[:, 1] ** 2 + beta * positions[:, 2] ** 2
+  )
+
+  return BoseParams(
+    alpha=alpha_derivative, beta=jnp.array(0.0), gamma=jnp.array(0.0), a=jnp.array(0.0)
+  )
+
+
 def local_energy_jax(positions: Array, params: BoseParams) -> Array:
   alpha, beta, gamma, a = params
   num_particles = positions.shape[0]
 
+  # Precompute parameter squares
   alpha2 = alpha**2
   beta2 = beta**2
   gamma2 = gamma**2
@@ -102,3 +115,23 @@ def local_energy_jax(positions: Array, params: BoseParams) -> Array:
   energy = jnp.where(violates, jnp.inf, energy)  # check for hard-core violation
 
   return energy
+
+
+def drift_force_jax(positions: Array, params: BoseParams):
+  alpha, beta, _, a = params
+  num_particles = positions.shape[0]
+
+  scale = jnp.array([1.0, 1.0, beta])
+  external_force = -4.0 * alpha * positions * scale
+
+  rij_vec = positions[:, None, :] - positions[None, :, :]
+  rij2 = jnp.sum(rij_vec**2, axis=-1)
+  rij = jnp.linalg.norm(rij_vec)
+
+  off_diagonal = ~jnp.eye(num_particles, dtype=bool)
+  violates = jnp.any((rij <= a) & off_diagonal)
+  inv = jnp.where(off_diagonal, 1.0 / (rij2 * (rij - a) ** 2), 0.0)
+  repulsive_force = 2 * a * jnp.sum(rij * inv[..., None], axis=1)
+
+  forces = external_force + repulsive_force
+  return jnp.where(violates, jnp.zeros_like(forces), forces)

@@ -2,6 +2,9 @@ import itertools
 from dataclasses import dataclass, fields
 from typing import NamedTuple, Protocol
 
+from numba import typeof
+from numba.typed import List
+
 
 class ParamConstructor[P: NamedTuple](Protocol):
   def __call__(self, **kwargs) -> P: ...
@@ -25,3 +28,13 @@ class ParameterGrid[P: NamedTuple]:
     return [
       self.param_type(**dict(zip(keys, combo))) for combo in itertools.product(*values)
     ]
+
+  def combos_numba(self):
+    combo_list = self.combos()
+
+    combo_typedlist = List.empty_list(typeof(combo_list[0]))
+
+    for combo in combo_list:
+      combo_typedlist.append(combo)
+
+    return combo_typedlist
