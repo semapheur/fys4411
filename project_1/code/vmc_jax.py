@@ -22,6 +22,189 @@ class OptimizationResult[P: NamedTuple](NamedTuple):
   error_history: NDArray[np.floating]
   parameters: P
 
+@jit(static_argnums=(0, 1, 2, 3, 5, 6))
+def metropolis_step_jax[P: NamedTuple](
+  dimensions: int,
+  particles: int,
+  wavefunction: Callable[[Array, P], Array],
+  local_energy: Callable[[Array, P], Array],
+  parameters: P,
+  step_size: float,
+  cycles: int,
+  rng_key: jnp.ndarray,
+) -> tuple[Array, Array, Array]:
+  """
+  Perform a single Metropolis Monte Carlo step. The function is JIT-compiled with static arguments using JAX
+
+  Parameters
+  ----------
+  wavefunction : Callable[[Array, P, Array]
+    Wave function used to calculate the probability amplitude.
+  local_energy : Callable[[Array, P, Array]
+    Local energy function used to calculate the energy.
+  parameters : P
+    Parameters used to evaluate the wave function and local energy.
+  step_size : float
+    Step size used to update the position.
+  cycles : int
+    Number of Monte Carlo cycles to perform.
+  rng_key : jnp.ndarray
+    Random key used to generate random numbers.
+
+  Returns
+  -------
+  energy : float
+    Calculated energy.
+  energy_squared : float
+    Calculated energy squared.
+  """
+
+  # Initialize variables
+  rng_key, init_key = random.split(rng_key)
+
+  position_0 = step_size * (
+    random.uniform(init_key, (particles, dimensions)) - 0.5
+  )
+  wf_0 = wavefunction(position_0, parameters)
+
+  def cycle_step(
+    carry: CycleCarryBrute, carry_key: Array
+  ) -> tuple[CycleCarryBrute, Array]:
+
+    position_old, wf_old, energy, energy2 = carry
+
+    # Split the random key
+    carry_key, walk_key, accept_key = random.split(carry_key, 3)
+
+    # Propose new configuration
+    delta = step_size * (random.uniform(walk_key, position_old.shape) - 0.5)
+    position_new = position_old + delta
+
+    # Calculate probability amplitude for proposed configuration
+    wf_new = wavefunction(position_new, parameters)
+
+    # Calculate acceptance ratio for the move
+    acceptance_ratio = (wf_new / wf_old) ** 2
+
+    # Update position and probability amplitude for accepted moves
+    accept = random.uniform(accept_key) < acceptance_ratio
+    position_old = jnp.where(accept, position_new, position_old)
+    wf_old = jnp.where(accept, wf_new, wf_old)
+
+    energy_delta = local_energy(position_old, parameters)
+    energy_new = energy + energy_delta
+    energy2_new = energy2 + energy_delta**2
+
+    return (position_old, wf_old, energy_new, energy2_new), energy_new
+
+  # Initialize carry
+  zero_scalar = jnp.array(0.0)  # Initial energy
+  carry_0 = (position_0, wf_0, zero_scalar, zero_scalar)
+
+  # Iterate over all Monte Carlo cycles
+  keys = random.split(rng_key, cycles)
+  (_, _, energy, energy2), energy_accummulator = lax.scan(
+    cycle_step, carry_0, keys
+  )
+
+  cycle_counts = jnp.arange(1, cycles + 1)
+  energies = energy_accummulator / cycle_counts
+
+  return energy / cycles, energy2 / cycles, energies
+
+@jit(static_argnums=(0, 1, 2, 3, 4, 6, 7, 8))
+def metropolis_step_importance_jax[P: NamedTuple](
+  dimensions: int,
+  particles: int,
+  wavefunction: Callable[[Array, P], Array],
+  local_energy: Callable[[Array, P], Array],
+  drift_force: Callable[[Array, P], Array],
+  parameters: P,
+  time_step: float,
+  diffusion_coefficient: float,
+  cycles: int,
+  rng_key: Array,
+) -> tuple[Array, Array, Array]:
+
+    # Precompute constants
+  dt_sqrt = jnp.sqrt(time_step)
+  dt_D = time_step * diffusion_coefficient
+
+  rng_key, init_key, cycle_key = random.split(rng_key, 3)
+
+  # Initialize positions with Gaussian noise
+  position_0 = (
+    random.normal(init_key, (particles, dimensions)) * dt_sqrt
+  )
+  wf_0 = wavefunction(position_0, parameters)
+  force_0 = drift_force(position_0, parameters)
+
+  def cycle_step(
+    carry: CycleCarryImportance, carry_key: Array
+  ) -> tuple[CycleCarryImportance, Array]:
+
+    position_old, wf_old, force_old, energy, energy2 = carry
+
+    walk_key, accept_key = random.split(carry_key)
+
+    # Propose new configuration
+    delta = random.normal(walk_key, (position_old.shape)) * dt_sqrt + force_old * dt_D
+    position_new = position_old + delta
+
+    # Calculate probability amplitude and quantum force for proposed configuration
+    wf_new = wavefunction(position_new, parameters)
+    force_new = drift_force(position_new, parameters)
+
+    # Calculate Green's function exponent
+    force_sum = force_old + force_new
+    force_diff = force_old - force_new
+    pos_diff = position_old - position_new
+    greens_exponent = jnp.sum(0.5 * force_sum * (0.5 * dt_D * force_diff + pos_diff))
+
+    # Calculate acceptance ratio for the move
+    acceptance_ratio = jnp.exp(greens_exponent) * (wf_new / wf_old) ** 2
+
+    # Update position and probability amplitude for accepted moves
+    accept = random.uniform(accept_key) < acceptance_ratio
+    position_old = jnp.where(accept, position_new, position_old)
+    wf_old = jnp.where(accept, wf_new, wf_old)
+    force_old = jnp.where(accept, force_new, force_old)
+
+    energy_delta = local_energy(position_old, parameters)
+    energy_new = energy + energy_delta
+    energy2_new = energy2 + energy_delta**2
+
+    return (
+      position_old,
+      wf_old,
+      force_old,
+      energy_new,
+      energy2_new,
+    ), energy_new
+
+  # Initalize carry for Monte Carlo cycles
+  zero_scalar = jnp.array(0.0)  # Initial energy
+  carry_0 = (
+    position_0,
+    wf_0,
+    force_0,
+    zero_scalar,
+    zero_scalar,
+  )
+
+  # Iterate over all Monte Carlo cycles
+  cycle_keys = random.split(cycle_key, cycles)
+  (_, _, _, energy, energy2), energy_accumulator = lax.scan(
+    cycle_step,
+    carry_0,
+    cycle_keys,
+  )
+
+  cycle_counts = jnp.arange(1, cycles + 1)
+  energies = energy_accumulator / cycle_counts
+
+  return energy / cycles, energy2 / cycles, energies
+
 
 class MetropolisJAX[P: NamedTuple]:
   """
@@ -40,187 +223,6 @@ class MetropolisJAX[P: NamedTuple]:
   def __init__(self, number_particles: int, dimensions: int):
     self.number_particles = number_particles
     self.dimensions = dimensions
-
-  @jit(static_argnums=(0, 1, 2, 4, 5))
-  def _step(
-    self,
-    wavefunction: Callable[[Array, P], Array],
-    local_energy: Callable[[Array, P], Array],
-    parameters: P,
-    step_size: float,
-    cycles: int,
-    rng_key: jnp.ndarray,
-  ) -> tuple[Array, Array, Array]:
-    """
-    Perform a single Metropolis Monte Carlo step. The function is JIT-compiled with static arguments using JAX
-
-    Parameters
-    ----------
-    wavefunction : Callable[[Array, P, Array]
-      Wave function used to calculate the probability amplitude.
-    local_energy : Callable[[Array, P, Array]
-      Local energy function used to calculate the energy.
-    parameters : P
-      Parameters used to evaluate the wave function and local energy.
-    step_size : float
-      Step size used to update the position.
-    cycles : int
-      Number of Monte Carlo cycles to perform.
-    rng_key : jnp.ndarray
-      Random key used to generate random numbers.
-
-    Returns
-    -------
-    energy : float
-      Calculated energy.
-    energy_squared : float
-      Calculated energy squared.
-    """
-
-    # Initialize variables
-    rng_key, init_key, cycle_key = random.split(rng_key, 3)
-
-    position_0 = step_size * (
-      random.uniform(init_key, (self.number_particles, self.dimensions)) - 0.5
-    )
-    wf_0 = wavefunction(position_0, parameters)
-
-    def cycle_step(
-      carry: CycleCarryBrute, carry_key: Array
-    ) -> tuple[CycleCarryBrute, Array]:
-
-      position_old, wf_old, energy, energy2 = carry
-
-      # Split the random key
-      walk_key, accept_key = random.split(carry_key)
-
-      # Propose new configuration
-      delta = step_size * (random.uniform(walk_key, position_old.shape) - 0.5)
-      position_new = position_old + delta
-
-      # Calculate probability amplitude for proposed configuration
-      wf_new = wavefunction(position_new, parameters)
-
-      # Calculate acceptance ratio for the move
-      acceptance_ratio = (wf_new / wf_old) ** 2
-
-      # Update position and probability amplitude for accepted moves
-      accept = random.uniform(accept_key) < acceptance_ratio
-      position_old = jnp.where(accept, position_new, position_old)
-      wf_old = jnp.where(accept, wf_new, wf_old)
-
-      energy_delta = local_energy(position_old, parameters)
-      energy_new = energy + energy_delta
-      energy2_new = energy2 + energy_delta**2
-
-      return (position_old, wf_old, energy_new, energy2_new), energy_new
-
-    # Initialize carry
-    zero_scalar = jnp.array(0.0)  # Initial energy
-    carry_0 = (position_0, wf_0, zero_scalar, zero_scalar)
-
-    # Iterate over all Monte Carlo cycles
-    cycle_keys = random.split(cycle_key, cycles)
-    (_, _, energy, energy2), energy_accummulator = lax.scan(
-      cycle_step, carry_0, cycle_keys
-    )
-
-    cycle_counts = jnp.arange(1, cycles + 1)
-    energies = energy_accummulator / cycle_counts
-
-    return energy / cycles, energy2 / cycles, energies
-
-  @jit(static_argnums=(0, 1, 2, 3, 5, 6, 7))
-  def _step_importance(
-    self,
-    wavefunction: Callable[[Array, P], Array],
-    local_energy: Callable[[Array, P], Array],
-    drift_force: Callable[[Array, P], Array],
-    parameters: P,
-    time_step: float,
-    diffusion_coefficient: float,
-    cycles: int,
-    rng_key: Array,
-  ) -> tuple[Array, Array, Array]:
-
-    # Precompute constants
-    dt_sqrt = jnp.sqrt(time_step)
-    dt_D = time_step * diffusion_coefficient
-
-    rng_key, init_key, cycle_key = random.split(rng_key, 3)
-
-    # Initialize positions with Gaussian noise
-    position_0 = (
-      random.normal(init_key, (self.number_particles, self.dimensions)) * dt_sqrt
-    )
-    wf_0 = wavefunction(position_0, parameters)
-    force_0 = drift_force(position_0, parameters)
-
-    def cycle_step(
-      carry: CycleCarryImportance, carry_key: Array
-    ) -> tuple[CycleCarryImportance, Array]:
-
-      position_old, wf_old, force_old, energy, energy2 = carry
-
-      walk_key, accept_key = random.split(carry_key)
-
-      # Propose new configuration
-      delta = random.normal(walk_key, (position_old.shape)) * dt_sqrt + force_old * dt_D
-      position_new = position_old + delta
-
-      # Calculate probability amplitude and quantum force for proposed configuration
-      wf_new = wavefunction(position_new, parameters)
-      force_new = drift_force(position_new, parameters)
-
-      # Calculate Green's function exponent
-      force_sum = force_old + force_new
-      force_diff = force_old - force_new
-      pos_diff = position_old - position_new
-      greens_exponent = jnp.sum(0.5 * force_sum * (0.5 * dt_D * force_diff + pos_diff))
-
-      # Calculate acceptance ratio for the move
-      acceptance_ratio = jnp.exp(greens_exponent) * (wf_new / wf_old) ** 2
-
-      # Update position and probability amplitude for accepted moves
-      accept = random.uniform(accept_key) < acceptance_ratio
-      position_old = jnp.where(accept, position_new, position_old)
-      wf_old = jnp.where(accept, wf_new, wf_old)
-      force_old = jnp.where(accept, force_new, force_old)
-
-      energy_delta = local_energy(position_old, parameters)
-      energy_new = energy + energy_delta
-      energy2_new = energy2 + energy_delta**2
-
-      return (
-        position_old,
-        wf_old,
-        force_old,
-        energy_new,
-        energy2_new,
-      ), energy_new
-
-    # Initalize carry for Monte Carlo cycles
-    zero_scalar = jnp.array(0.0)  # Initial energy
-    carry_0 = (
-      position_0,
-      wf_0,
-      force_0,
-      zero_scalar,
-      zero_scalar,
-    )
-
-    # Iterate over all Monte Carlo cycles
-    cycle_keys = random.split(cycle_key, cycles)
-    (_, _, _, energy, energy2), energy_accumulator = lax.scan(
-      cycle_step,
-      carry_0,
-      cycle_keys,
-    )
-
-    cycle_counts = jnp.arange(1, cycles + 1)
-    energies = energy_accumulator / cycle_counts
-
-    return energy / cycles, energy2 / cycles, energies
 
   @jit(static_argnums=(0, 1, 2, 3, 4, 6, 7, 8))
   def _step_optimization(
@@ -329,7 +331,9 @@ class MetropolisJAX[P: NamedTuple]:
   ) -> tuple[Array, Array, Array]:
     rng_key = random.PRNGKey(seed)
 
-    return self._step_importance(
+    return metropolis_step_importance_jax(
+      self.dimensions,
+      self.number_particles,
       wavefunction,
       local_energy,
       drift_force,
@@ -406,7 +410,9 @@ class MetropolisJAX[P: NamedTuple]:
     """
 
     def run_one(params_slice: P, rng_key: Array) -> tuple[Array, Array, Array]:
-      return self._step(
+      return metropolis_step_jax(
+        self.dimensions,
+        self.number_particles,
         wavefunction,
         local_energy,
         params_slice,
@@ -455,7 +461,9 @@ class MetropolisJAX[P: NamedTuple]:
     """
 
     def run_one(params_slice: P, rng_key: Array) -> tuple[Array, Array, Array]:
-      return self._step_importance(
+      return metropolis_step_importance_jax(
+        self.dimensions,
+        self.number_particles,
         wavefunction,
         local_energy,
         drift_force,

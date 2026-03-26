@@ -1,6 +1,6 @@
 from typing import NamedTuple
 
-from jax import Array, debug
+from jax import Array, ops, vmap
 import jax.numpy as jnp
 
 
@@ -11,36 +11,49 @@ class BoseParams(NamedTuple):
   a: Array
 
 
-def wavefunction_jax(positions: Array, params: BoseParams) -> Array:
+def wavefunction_jax(positions: Array, params: BoseParams):
   alpha, beta, _, a = params
-  num_particles = positions.shape[0]
-
-  x2 = positions[:, 0] ** 2
-  y2 = positions[:, 1] ** 2
-  z2 = positions[:, 2] ** 2
 
   # Single particle factor
-  g = jnp.exp(-alpha * (x2 + y2 + beta * z2))
-  single_particle = jnp.prod(g)
+  r2_weighted = (
+    positions[:, 0] ** 2 + positions[:, 1] ** 2 + beta * positions[:, 2] ** 2
+  )
+  log_single_particle = -alpha * jnp.sum(r2_weighted)
 
-  # Pairwise distances
-  rij_vec = positions[:, None, :] - positions[None, :, :]
-  rij = jnp.linalg.norm(rij_vec, axis=-1)
+  # Pairwise Jastrow factor using vmap
+  def jastrow_factor(position_i: Array, all_positions: Array):
+    # Distance calculation
+    rij_vec = position_i - all_positions
+    rij = jnp.sqrt(jnp.sum(rij_vec**2, axis=-1))
 
-  i_idx, j_idx = jnp.triu_indices(num_particles, k=1)
-  rij_pairs = rij[i_idx, j_idx]
+    # Mask self-interaction (where rij == 0)
+    mask = rij > 0
 
-  # Hard-core condition
-  violates = jnp.any(rij_pairs <= a)
+    # Stability: Ensure we don't take log of negative or div by zero
+    safe_rij = jnp.where(mask, rij, a + 1.0)
 
-  # Jastrow factor
-  jastrow_factor = jnp.prod(1.0 - a / rij_pairs)
+    # log(1 - a/r)
+    jastrow_terms = jnp.where(mask, jnp.log1p(-a / safe_rij), 0.0)
 
-  # Wavefunction
-  psi = single_particle * jastrow_factor
-  psi = jnp.where(violates, 0.0, psi)  # chceck for violations
+    # Check violations (only for other particles)
+    violation_found = jnp.any((rij <= a) & mask)
 
-  return psi
+    return jnp.sum(jastrow_terms), violation_found
+
+  # Map the scan over all particles
+  log_jastrow_vec, violates_vec = vmap(jastrow_factor, in_axes=(0, None))(
+    positions, positions
+  )
+
+  # Since we summed all i,j (where i != j), we have to divide by 2
+  log_jastrow_factor = 0.5 * jnp.sum(log_jastrow_vec)
+  violates = jnp.any(violates_vec)
+
+  # Compute wavefunction
+  log_psi = log_single_particle + log_jastrow_factor
+  psi = jnp.exp(log_psi)
+
+  return jnp.where(violates, 0.0, psi)
 
 
 def wavefunction_derivative_jax(positions: Array, params: BoseParams) -> BoseParams:
@@ -57,7 +70,6 @@ def wavefunction_derivative_jax(positions: Array, params: BoseParams) -> BosePar
 
 def local_energy_jax(positions: Array, params: BoseParams) -> Array:
   alpha, beta, gamma, a = params
-  num_particles = positions.shape[0]
 
   # Precompute parameter squares
   alpha2 = alpha**2
@@ -73,32 +85,45 @@ def local_energy_jax(positions: Array, params: BoseParams) -> Array:
     -2.0 * alpha * (2.0 + beta) + 4.0 * alpha2 * (r2_xy + beta2 * r2_z)
   )
 
-  # Pairwise distances
-  rij_vec = positions[:, None, :] - positions[None, :, :]
-  rij = jnp.linalg.norm(rij_vec, axis=-1)
-  rij2 = rij**2
+  # Particle interaction terms
+  def particle_interactions(position_i: Array, all_positions: Array):
+    rij_vec = position_i - all_positions
+    rij2 = jnp.sum(rij_vec**2, axis=-1)
+    rij = jnp.sqrt(rij2)
 
-  # Hard-core condition
-  off_diagonal = ~jnp.eye(num_particles, dtype=bool)  # mask out diagonal
-  violates = jnp.any((rij <= a) & off_diagonal)
+    # Mask self-interaction (where rij == 0)
+    mask = rij > 0
 
-  safe_dist = jnp.where(off_diagonal, rij, 1.0)
+    # Ensure stability by avoiding negative log or division by zero
+    safe_rij = jnp.where(mask, rij, a + 1.0)
 
-  # Cross terms
-  inv_dist = 1.0 / (safe_dist**2 * (safe_dist - a))
-  nominator_2 = (
-    rij_vec[..., 0] * positions[:, 0, None]
-    + rij_vec[..., 1] * positions[:, 1, None]
-    + beta * rij_vec[..., 2] * positions[:, 2, None]
-  )
-  term_2 = jnp.sum(jnp.where(off_diagonal, nominator_2 * inv_dist, 0.0))
+    # Compute cross terms
+    inv_factor = jnp.where(mask, 1.0 / (rij2 * (safe_rij - a)), 0.0)
 
-  term_4 = jnp.sum(jnp.where(off_diagonal, 1.0 / (rij2 * (rij - a) ** 2), 0.0))
+    nominator_2 = (
+      rij_vec[:, 0] * position_i[0]
+      + rij_vec[:, 1] * position_i[1]
+      + beta * rij_vec[:, 2] * position_i[2]
+    )
+    term_2_i = jnp.sum(nominator_2 * inv_factor)
 
-  u_vec = jnp.sum(
-    jnp.where(off_diagonal[:, :, None], rij_vec * inv_dist[..., None], 0.0), axis=1
-  )
-  term_3 = jnp.sum(jnp.sum(u_vec**2, axis=-1))
+    uij2 = rij2 * inv_factor**2
+    term_3_i = jnp.sum(uij2)
+
+    term_4_i = jnp.sum(jnp.where(mask, 1.0 / (rij2 * (safe_rij - a) ** 2), 0.0))
+
+    violates_i = jnp.any((rij <= a) & mask)
+
+    return term_2_i, term_3_i, term_4_i, violates_i
+
+  term_2_vec, term_3_vec, term_4_vec, violates_vec = vmap(
+    particle_interactions, in_axes=(0, None)
+  )(positions, positions)
+
+  term_2 = jnp.sum(term_2_vec)
+  term_3 = jnp.sum(term_3_vec)
+  term_4 = jnp.sum(term_4_vec)
+  violates = jnp.any(violates_vec)
 
   # Logarithmic Laplacian
   log_laplacian = (
@@ -106,15 +131,12 @@ def local_energy_jax(positions: Array, params: BoseParams) -> Array:
   )
 
   # Elliptic trap potential
-  elliptic_trap = jnp.sum(
-    positions[:, 0] ** 2 + positions[:, 1] ** 2 + gamma2 * positions[:, 2] ** 2
-  )
+  elliptic_trap = jnp.sum(r2_xy + gamma2 * r2_z)
 
   # Local energy
   energy = 0.5 * (-log_laplacian + elliptic_trap)
-  energy = jnp.where(violates, jnp.inf, energy)  # check for hard-core violation
 
-  return energy
+  return jnp.where(violates, jnp.inf, energy)  # check for hard-core violation
 
 
 def drift_force_jax(positions: Array, params: BoseParams):
