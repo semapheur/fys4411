@@ -1,7 +1,7 @@
 from typing import NamedTuple
 
 import jax.numpy as jnp
-from jax import Array
+from jax import Array, grad, jvp, vmap
 from utils import gradient_finite_diff_jax, laplacian_finite_diff_jax
 
 
@@ -14,7 +14,6 @@ def wavefunction_jax(positions: Array, params: HarmonicParams) -> Array:
   r2 = jnp.sum(positions**2)
 
   return jnp.exp(-alpha * r2)
-
 
 def log_wavefunction_jax(positions: Array, params: HarmonicParams) -> Array:
   alpha = params.alpha
@@ -42,32 +41,42 @@ def local_energy_jax(positions: Array, params: HarmonicParams) -> Array:
 
 
 def local_energy_numeric_jax(positions: Array, params: HarmonicParams) -> Array:
+  """
+  Computes the local energy numerically using this formula for logarithmic Laplacian (∇^2 Ψ/Ψ) = ∇^2 (ln Ψ) + |∇ ln Ψ|^2
+  """
 
-  wf = wavefunction_jax(positions, params)
+  def log_wf_partial(pos: Array) -> Array:
+    return log_wavefunction_jax(pos, params)
+  
+  wf_log_grad = grad(log_wf_partial)(positions)
 
-  def wf_partial(pos: Array) -> Array:
-    return wavefunction_jax(pos, params)
+  def log_wf_grad_flat(pos: Array) -> Array:
+    return grad(log_wf_partial)(pos.reshape(positions.shape)).reshape(-1)
 
-  wf_laplacian = laplacian_finite_diff_jax(wf_partial, positions)
+  positions_flat = positions.reshape(-1) 
+  dim = positions_flat.size
+  eye = jnp.eye(dim)
+  _, hessian_rows = vmap(lambda t: jvp(log_wf_grad_flat, (positions_flat,), (t,)))(eye)
 
-  potential_external = 0.5 * jnp.sum(positions**2)
-  kinetic = -0.5 * wf_laplacian / wf
+  wf_log_laplacian = jnp.trace(hessian_rows)
 
-  return kinetic + potential_external
+  potential_external = jnp.sum(positions**2)
+  kinetic = wf_log_laplacian  + jnp.sum(wf_log_grad**2)
+
+  return 0.5 * (-kinetic + potential_external)
 
 
-def drift_force_jax(position: Array, params: HarmonicParams) -> Array:
+def drift_force_jax(positions: Array, params: HarmonicParams) -> Array:
   alpha = params.alpha
-  return -4 * alpha * position
+  return -4 * alpha * positions
 
 
-def drift_force_numeric_jax(position: Array, params: HarmonicParams) -> Array:
+def drift_force_numeric_jax(positions: Array, params: HarmonicParams) -> Array:
+  """
+  Computes the quantum force using the formula F = 2 * ∇ ln Ψ 
+  """
 
-  wf = wavefunction_jax(position, params)
+  def log_wf_partial(pos: Array) -> Array:
+    return log_wavefunction_jax(pos, params)
 
-  def wf_partial(pos: Array) -> Array:
-    return wavefunction_jax(pos, params)
-
-  wf_gradient = gradient_finite_diff_jax(wf_partial, position)
-
-  return 2 * wf_gradient / wf
+  return 2 * grad(log_wf_partial)(positions)

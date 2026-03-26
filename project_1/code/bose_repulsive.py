@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import NamedTuple
 
 import numpy as np
-from numba import njit, prange
+from numba import njit
 from numpy.typing import NDArray
 from structs import ParamConstructor, ParameterGrid
 
