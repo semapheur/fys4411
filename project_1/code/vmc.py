@@ -17,6 +17,7 @@ class GridSearchResult[P: NamedTuple](NamedTuple):
   energies: NDArray[np.floating]
   variances: NDArray[np.floating]
   errors: NDArray[np.floating]
+  accept_rates: NDArray[np.floating]
 
 
 @njit(fastmath=True)
@@ -26,9 +27,9 @@ def metropolis_step_numba[P: NamedTuple](
   parameters: P,
   step_size: float,
   cycles: int,
-  number_particles: int,
+  particles: int,
   dimension: int,
-) -> tuple[float, float, NDArray[np.floating]]:
+) -> tuple[float, float, float, NDArray[np.floating]]:
   """
   Perform a single Metropolis Monte Carlo step. JIT-compiled using numba
 
@@ -56,8 +57,8 @@ def metropolis_step_numba[P: NamedTuple](
   """
 
   # Initialize variables
-  positions = np.zeros((number_particles, dimension), dtype=np.float64)
-  for i in range(number_particles):
+  positions = np.zeros((particles, dimension), dtype=np.float64)
+  for i in range(particles):
     for j in range(dimension):
       positions[i, j] = step_size * (np.random.rand() - 0.5)
 
@@ -66,13 +67,14 @@ def metropolis_step_numba[P: NamedTuple](
   wf_old = wavefunction(positions, parameters)
 
   # Initialize output variables
+  accept_count = 0
   energy = 0.0
   energy2 = 0.0
   energies = np.empty(cycles, dtype=np.float64)
 
   # Perform Monte Carlo cycles
   for cycle in range(cycles):
-    for i in range(number_particles):
+    for i in range(particles):
       # Store current position of particle i before proposing move
       for j in range(dimension):
         row_store[j] = positions[i, j]
@@ -87,6 +89,7 @@ def metropolis_step_numba[P: NamedTuple](
 
       if np.random.rand() < acceptance_ratio:  # Accept move
         wf_old = wf_new
+        accept_count += 1
       else:  # Reject move
         for j in range(dimension):
           positions[i, j] = row_store[j]
@@ -97,10 +100,11 @@ def metropolis_step_numba[P: NamedTuple](
     energy2 += energy_delta**2
     energies[cycle] = energy / (cycle + 1)
 
+  accept_rate = accept_count / (cycles * particles)
   energy /= cycles
   energy2 /= cycles
 
-  return energy, energy2, energies
+  return accept_rate, energy, energy2, energies
 
 
 @njit(fastmath=True)
@@ -112,9 +116,9 @@ def metropolis_step_importance_numba[P: NamedTuple](
   time_step: float,
   diffusion_coefficient: float,
   cycles: int,
-  number_particles: int,
+  particles: int,
   dimension: int,
-) -> tuple[float, float, NDArray[np.floating]]:
+) -> tuple[float, float, float, NDArray[np.floating]]:
   """
   Perform a single Metropolis Monte Carlo step using Langevin dynamics. JIT-compiled using numba
 
@@ -150,8 +154,8 @@ def metropolis_step_importance_numba[P: NamedTuple](
   dt_D = time_step * diffusion_coefficient
 
   # Initialize positions with Gaussian noise
-  positions = np.zeros((number_particles, dimension), dtype=np.float64)
-  for i in range(number_particles):
+  positions = np.zeros((particles, dimension), dtype=np.float64)
+  for i in range(particles):
     for j in range(dimension):
       positions[i, j] = np.random.randn() * dt_sqrt
 
@@ -161,13 +165,14 @@ def metropolis_step_importance_numba[P: NamedTuple](
   force_new = np.empty_like(force_old)
   wf_old = wavefunction(positions, parameters)
 
+  accept_count = 0
   energy = 0.0
   energy2 = 0.0
   energies = np.empty(cycles, dtype=np.float64)
 
   # Perform Monte Carlo cycles
   for cycle in range(cycles):
-    for i in range(number_particles):
+    for i in range(particles):
       # Store current position of particle i before proposing move
       for j in range(dimension):
         row_store[j] = positions[i, j]
@@ -194,6 +199,7 @@ def metropolis_step_importance_numba[P: NamedTuple](
 
       if np.random.rand() < acceptance_ratio:  # Accept move
         wf_old = wf_new
+        accept_count += 1
         for d in range(dimension):
           force_old[i, d] = force_new[i, d]
 
@@ -207,10 +213,11 @@ def metropolis_step_importance_numba[P: NamedTuple](
     energy2 += energy_delta**2
     energies[cycle] = energy / (cycle + 1)
 
+  accept_rate = accept_count / (cycles * particles)
   energy /= cycles
   energy2 /= cycles
 
-  return energy, energy2, energies
+  return accept_rate, energy, energy2, energies
 
 
 @njit(fastmath=True)
@@ -223,7 +230,7 @@ def metropolis_step_optimization_numba[P: NamedTuple](
   time_step: float,
   diffusion_coefficient: float,
   cycles: int,
-  number_particles: int,
+  particles: int,
   dimension: int,
 ):
 
@@ -232,8 +239,8 @@ def metropolis_step_optimization_numba[P: NamedTuple](
   dt_D = time_step * diffusion_coefficient
 
   # Initialize positions with Gaussian noise
-  positions = np.zeros((number_particles, dimension), dtype=np.float64)
-  for i in range(number_particles):
+  positions = np.zeros((particles, dimension), dtype=np.float64)
+  for i in range(particles):
     for j in range(dimension):
       positions[i, j] = np.random.randn() * dt_sqrt
 
@@ -249,7 +256,7 @@ def metropolis_step_optimization_numba[P: NamedTuple](
 
   # Perform Monte Carlo cycles
   for _ in range(cycles):
-    for i in range(number_particles):
+    for i in range(particles):
       # Store current position of particle i before proposing move
       for j in range(dimension):
         position_old[j] = positions[i, j]
@@ -314,9 +321,10 @@ def run_grid_search_numba[P: NamedTuple](
   energies = np.empty(iterations)
   variances = np.empty(iterations)
   errors = np.empty(iterations)
+  accept_rates = np.empty(iterations)
 
   for i in prange(iterations):
-    energy, energy2, _ = metropolis_step_numba(
+    accept_rate, energy, energy2, _ = metropolis_step_numba(
       wavefunction,
       local_energy,
       params_list[i],
@@ -330,8 +338,9 @@ def run_grid_search_numba[P: NamedTuple](
     var = energy2 - energy**2
     variances[i] = var
     errors[i] = np.sqrt(np.abs(var) / cycles)
+    accept_rates[i] = accept_rate
 
-  return energies, variances, errors
+  return energies, variances, errors, accept_rates
 
 
 @njit(parallel=True)
@@ -351,9 +360,10 @@ def run_grid_search_importance_numba[P: NamedTuple](
   energies = np.empty(iterations)
   variances = np.empty(iterations)
   errors = np.empty(iterations)
+  accept_rates = np.empty(iterations)
 
   for i in prange(iterations):
-    energy, energy2, _ = metropolis_step_importance_numba(
+    accept_rate, energy, energy2, _ = metropolis_step_importance_numba(
       wavefunction,
       local_energy,
       drift_force,
@@ -369,8 +379,9 @@ def run_grid_search_importance_numba[P: NamedTuple](
     var = energy2 - energy**2
     variances[i] = var
     errors[i] = np.sqrt(np.abs(var) / cycles)
+    accept_rates[i] = accept_rate
 
-  return energies, variances, errors
+  return energies, variances, errors, accept_rates
 
 
 class Metropolis[P: NamedTuple]:
@@ -448,7 +459,7 @@ class Metropolis[P: NamedTuple]:
 
     params_list = parameter_grid.combos_numba()
 
-    energies, variances, errors = run_grid_search_numba(
+    energies, variances, errors, accept_rates = run_grid_search_numba(
       wavefunction,
       local_energy,
       params_list,
@@ -463,6 +474,7 @@ class Metropolis[P: NamedTuple]:
       energies=energies,
       variances=variances,
       errors=errors,
+      accept_rates=accept_rates
     )
 
   def grid_search_importance[PG: ParameterGrid[P]](
@@ -506,7 +518,7 @@ class Metropolis[P: NamedTuple]:
 
     params_list = parameter_grid.combos_numba()
 
-    energies, variances, errors = run_grid_search_importance_numba(
+    energies, variances, errors, accept_rates = run_grid_search_importance_numba(
       wavefunction,
       local_energy,
       drift_force,
@@ -523,6 +535,7 @@ class Metropolis[P: NamedTuple]:
       energies=energies,
       variances=variances,
       errors=errors,
+      accept_rates=accept_rates
     )
 
   def optimize(

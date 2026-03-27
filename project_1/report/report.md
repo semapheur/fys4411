@@ -6,7 +6,7 @@ site:
   template: article-theme
 exports:
   - format: pdf
-    #template: ../../report_template
+    template: ../../report_template
     output: report.pdf
     showtoc: true
 math:
@@ -18,9 +18,16 @@ math:
   '\unitvec': '{\hat{\mathbf{#1}}}'
 bibliography: references.bib
 abstract: |
+  We apply variational Monte Carlo (VMC) and steepest descent optimization to estimate the ground‑state energy of a Bose gas with Jastrow-type repulsive interactions. The trial wavefunction is sampled using Metropolis importance sampling driven by Langevin dynamics, which incorporates drift terms to guide walkers toward regions of high probability density. Our optimization results captures the expected spatial expansion of the condensate induced by repulsive interactions.
 ---
 
-# Theory
+# Introduction
+
+In this report, we investigate the use of variational Monte Caro to compute the ground‑state energy of a Bose gas with Jastrow‑type repulsive interactions. A key component of any Monte Carlo simulation is the sampling strategy used to explore the probability distribution defined by the trial wavefunction. We therefore employ and compare two different sampling techniques: the brute‑force Metropolis algorithm with symmetric proposal moves, and an importance‑sampling scheme driven by Langevin dynamics. While the brute‑force approach relies on unbiased random displacements, importance sampling incorporates drift terms that guide walkers toward regions of high probability density, potentially improving sampling efficiency and reducing statistical fluctuations.
+
+To validate and calibrate these methods, we first apply them to the non‑interacting harmonic oscillator, a system with an analytically known ground state. This benchmark allows us to assess the accuracy, stability, and convergence properties of each sampling strategy. Having established a reliable computational framework, we then extend the analysis to the interacting Bose gas. By combining VMC with steepest‑descent optimization, we determine the optimal Gaussian confinement parameter in the trial wavefunction and examine how it responds to repulsive correlations.
+
+# Theory and Method
 
 ## Bose Gas Correlated Model
 
@@ -174,6 +181,7 @@ where $d$ is the spatial dimension of the system.
 Inserting the spherical trap potential from [](#equation:trap-potential), the local energy [](#equation:local-energy-noninteracting) becomes
 
 $$
+\label{equation:local-energy-noninteracting-analytic}
   E_L (\mathbf{R}) = \frac{d\hbar^2 \alpha N}{m} + \sum_{i=1}^N \left(\frac{1}{2} m\omega_\text{ho}^2 - \frac{2\hbar^2 \alpha^2}{m} \right) r_i^2.
 $$
 
@@ -186,10 +194,20 @@ $$
 which corresponds to the exact ground-state width of the harmonic-oscillator. In this case, the local energy becomes a constant,
 
 $$
+\label{equation:ground-state-energy-noninteracting}
   E_L = \frac{d}{2} N\hbar \omega_\text{ho},
 $$
 
 which coincides with the exact ground state-energy of $N$ non-interacting bosons in a spherical harmonic trap.
+
+In addition the analytic expression [](#equation:local-energy-noninteracting-analytic), the local energy can be numerically approximated using finite difference derivation to compute the Laplacian $\nabla^2 \phi$ in [](#equation:local-energy-noninteracting). The second-order central difference approximation is given by
+
+$$
+\label{equation:second-order-finite-difference}
+  \nabla^2 \phi (\mathbf{r}) \approx \sum_{j=1}^d \frac{\phi(\mathbf{r} + h\mathbf{e}_j) - 2\phi(\mathbf{r}_j) + \phi(\mathbf{r}_i - h\mathbf{e}_j)}{h^2}
+$$
+
+where $h$ is the finite-difference step size, and $\mathbf{e}_j$ is the unit vector in the $j$th coordinate direction.
 
 #### Interacting Case
 
@@ -267,14 +285,14 @@ $$
 
 This special case corresponds to the original algorithm by [](article_metropolis_etal_1953), referred to as the *Metropolis algorithm*.
 
-Using this procedure to generate samples $\set{\mathbf{R}_k}_{k=1}^M \sim P_{\boldsymbol{\alpha}}$, the expectation [](#equation:trial-wavefunction) approximates to the empirical mean by the law of large numbers
+Using this procedure to generate samples $\set{\mathbf{R}_k}_{k=1}^M \sim P_{\boldsymbol{\alpha}}$, the expectation [](#equation:trial-wavefunction) approximates to the sample mean by the law of large numbers:
 
 $$
 \label{equation:energy-estimation}
-  E(\boldsymbol{\alpha}) \approx \frac{1}{M} \sum_{k=1}^M E_L (\mathbf{R}^{(k)}; \boldsymbol{\alpha})
+  E(\boldsymbol{\alpha}) \approx \frac{1}{M} \sum_{k=1}^M E_L (\mathbf{R}^{(k)}; \boldsymbol{\alpha}) := \bar{E}_{\boldsymbol{\alpha}}, 
 $$
 
-The Metropolis algorithm using a symmetric transition kernel can be summarized as follows:
+where $M$ is the number of Monte Carlo samples. The Metropolis algorithm using a symmetric transition kernel can be summarized as follows:
 
 Given parameters $\boldsymbol{\alpha}$:
 1. Initialize the configuration $\mathbf{R}^{(0)}$
@@ -298,8 +316,7 @@ $$
 
 ## Importance Sampling
 
-To improve the efficiency of the Metropolis algorithm, we can apply importance sampling using Langevin molecular dynamics. 
-A diffusion process characterized by a time-dependent probability density $P(\mathbf{R}, t)$ on $\R^{3N}$, is given by the Fokker-Planck equation
+To improve the efficiency of the random-walk Metropolis algorithm, we can apply importance sampling using Langevin molecular dynamics. A diffusion process characterized by a time-dependent probability density $P(\mathbf{R}, t)$ on $\R^{3N}$, is given by the Fokker-Planck equation
 
 $$
 \label{equation:fokker-planck}
@@ -315,6 +332,7 @@ $$
 where $\boldsymbol{\eta}$ a random vector driven by a Wiener process. In discretized time steps $\Delta t$, the updated position is given by
 
 $$
+\label{equation:langevin-discretized}
   \mathbf{R}' = \mathbf{R} + D\mathbf{F}(\mathbf{R}) \Delta T + \xi \sqrt{\Delta t}
 $$
 
@@ -427,6 +445,7 @@ The first term, corresponding to the single-particle elliptic confinement, is di
 The optimal variational parameters $\bar{\boldsymbol{\alpha}}$ can be obtained by minimizing the variational energy $E(\boldsymbol{\alpha})$. This can be achieved by using the gradient $\nabla_{\boldsymbol{\alpha}} E(\boldsymbol{\alpha})$ with respect to variational parameters as the objective for an optimization procedure. As shown in [](#Energy Derivative Formula), the energy derivative with respect to a parameter $\alpha_k$ can be written as
 
 $$
+\label{equation:energy-derivatives}
   \frac{\partial E}{\partial\alpha_k} = 2 \left( \Braket{\frac{\partial_{\alpha_k} \Psi_T (\mathbf{R}; \boldsymbol{\alpha})}{\Psi_T (\mathbf{R}; \boldsymbol{\alpha})} E_L (\mathbf{R}; \boldsymbol{\alpha})} - \Braket{\frac{\partial_{\alpha_k} \Psi_T (\mathbf{R}; \boldsymbol{\alpha})}{\Psi_T (\mathbf{R}; \boldsymbol{\alpha})}} \braket{E_L (\mathbf{R}; \boldsymbol{\alpha})} \right)
 $$
 
@@ -437,7 +456,7 @@ $$
 In the non-interacting case with a spherical trap, the trial wavefunction depends only on the Gaussian confinement parameter $\alpha$. The logarithmic derivative with respect to $\alpha$ is therfore
 
 $$
-  \frac{\partial_{\alpha} \Psi_T (\mathbf{R}; \alpha)}{\Psi_T (\boldsymbol{R}; \alpha)} = \frac{\partial}{\partial\alpha} \ln \left[\exp\left(-\alpha \sum_{i=1}^N r_i^2 \right) \right] = -\sum_{i=1}^N r_i^2
+  \frac{\partial_{\alpha} \Psi_T (\mathbf{R}; \alpha)}{\Psi_T (\boldsymbol{R}; \alpha)} = \frac{\partial}{\partial\alpha} \ln \left[\exp\left(-\alpha \sum_{i=1}^N r_i^2 \right) \right] = -\sum_{i=1}^N r_i^2.
 $$
 
 #### Interacting Case
@@ -447,27 +466,135 @@ In the interacting case, the trial wavefunction also depends on the anisotrophy 
 $$
 \begin{align*}
   \frac{\partial_{\alpha} \Psi_T (\mathbf{R}; \alpha, \beta)}{\Psi_T (\boldsymbol{R}; \alpha)} =& \frac{\partial}{\partial\alpha} \ln\left[\exp\left(-\alpha \sum_{i=1}^N \left(x_i^2 + y_i^2 + \beta z_i^2 \right) \right) \prod_{j < k} f(a, r_{jk}) \right] \\
-  =& \frac{\partial}{\partial\alpha} \left[-\alpha \sum_{i=1}^N \left(x_i^2 + y_i^2 + \beta z_i^2 \right) + \sum_{j < k} \ln[f(a, r_{jk})] \right]
+  =& \frac{\partial}{\partial\alpha} \left[-\alpha \sum_{i=1}^N \left(x_i^2 + y_i^2 + \beta z_i^2 \right) + \sum_{j < k} \ln[f(a, r_{jk})] \right].
 \end{align*}
 $$
 
 Since the Jastrow correlation functions $f(a, r_{jk})$ are independent of $\alpha$, the second term vanishes under $\partial/\partial_\alpha$, resulting in 
 
 $$
-  \frac{\partial_{\alpha} \Psi_T (\mathbf{R}; \alpha)}{\Psi_T (\boldsymbol{R}; \alpha)} = -\sum_{i=1}^N \left(x_i^2 + y_i^2 + \beta z_i^2 \right)
+  \frac{\partial_{\alpha} \Psi_T (\mathbf{R}; \alpha)}{\Psi_T (\boldsymbol{R}; \alpha)} = -\sum_{i=1}^N \left(x_i^2 + y_i^2 + \beta z_i^2 \right).
 $$
 
 Similarly, the logarithmic derivative with respect to $\beta$ is
 
 $$
-  \frac{\partial_{\beta} \Psi_T (\mathbf{R}; \alpha, \beta)}{\Psi_T (\boldsymbol{R}; \alpha)} = -\alpha \sum_{i=1}^N z_i^2
+  \frac{\partial_{\beta} \Psi_T (\mathbf{R}; \alpha, \beta)}{\Psi_T (\boldsymbol{R}; \alpha)} = -\alpha \sum_{i=1}^N z_i^2.
 $$
 
-# Results
+# Results and Discussion
 
-## Non-Interacting Case
+## Harmonic Oscillator
 
-The numerical approach using finite difference derivation to evaluate the Laplacian of $\Psi_T$ requires $O(2nd)$ operations, since it requires calculating the wavefunction twice per coordinate, while the analytic expression scales as $O(1)$.
+This section presents simulation results obtained using variational Monte Carlo to estimate the ground‑state energy of the harmonic oscillator, first using a brute‑force Metropolis sampler with a symmetric proposal and subsequently employing importance sampling.
+
+### Parameter Grid Seach using Brute-force Metropolis
+
+We began our analysis by applying the brute‑force Metropolis algorithm to estimate the ground‑state energy of the harmonic oscillator. This provided a baseline against which more advanced sampling strategies could later be compared. [](#figure:vmc-harmonic-grid-analytic) shows grid-search results for the variational parameter $\alpha$ using the analytical expression for the local energy given in [](#equation:local-energy-noninteracting-analytic). To assess how system size and dimensionality influence the variational landscape, simulations were performed for particle numbers $N=1, 10, 100$ and $500$ particles and $d=1,2$ and $3$ spatial dimensions. 
+
+In all cases, the energy curves display a clear minimum near $\alpha \approx 0.5$ corresponding to the expected energy $\bar{E}_\alpha \approx 0.5 dN$. This confirms the linear scaling of the ground-state energy with both particle number and dimension, in agreement with the exact expression in [](#equation:ground-state-energy-noninteracting).
+
+An observed trend in our simulations is that that the acceptance rate decreases as the particle number $N$ increases. Increasing $N$ effectively raises the dimensionality of the configuration space in which proposed moves are made in the Metropolis algorith. For a fixed step size, the displacement of the proposed moves in higher dimensions become increasingly larger relative to the width of the wavefunction, leading to a reduced acceptance rate. To maintain stable acceptance rate and ensure numerical stability for increasing $N$, we adopt a scaled step size $s/\sqrt{N}$ in our simulations, where $s$ is a baseline displacement parameter.
+
+```{figure} figures/vmc_bose_harmonic_grid_analytic.pdf
+:label: figure:vmc-harmonic-grid-analytic
+:alt: vmc-harmonic-grid-analytic
+:align: center
+
+Grid search energy estimates for the harmonic oscillator obtained using brute-force Metropolis algorithm with analytical local energy for $N=1,10,100, 500$ particles in $d=1,2, 3$ spatial dimensions. All simulations use $100,000$ Monte Carlo cycles and a scaled step size $s = 1.0 / \sqrt{N}$.
+```
+
+We also employed finite difference derivates to compute the logarithmic Laplacian of the trial wavefunction in the local-energy expression [](#equation:local-energy-noninteracting). As shown in [](#figure:vmc_bose_harmonic_grid_analytic_numerical), a random-walk Metropolis sampler using this numerical approach produces energy curves that closely match those obtained with the analytic expression, albeit at a higher computational cost. Benchmarking the computation times shows that the analytic approach is approximately twice as fast as the numerical one. The second-order finite difference derivation [](#equation:second-order-finite-difference) requires two evaluations of the wavefunction $\Psi_T$ in each coordinate direction, and thus scales as $O(2dN)$ operations.  The analytic expression, in comparison, scales as $O(1)$.
+
+```{figure} figures/vmc_bose_harmonic_grid_analytic_numerical.pdf
+:label: figure:vmc-harmonic-grid-analytic-numerical
+:alt: vmc-harmonic-grid-analytic-numeric
+:align: center
+
+Comparison of grid search energy estimates for the harmonic oscillator obtained using brute-force Metropolis sampler with analytic and numerical local-energy evaluations for $N=100$ particles in $d=3$ spatial dimensions. The simulation uses $1,000,000$ Monte Carlo cycles and step size $s = 1.0 / \sqrt{N}$.
+```
+
+### Parameter Grid Search using Metropolis Importance Sampling
+
+We next applied the Metropolis algorithm with importance sampling to estimate the ground‑state energy of the harmonic oscillator. [](#figure:vmc-harmonic-importance-time-step-dependence) shows how the estimated energy depends on the time step $\Delta t$. For relatively high $\Delta t$, the proposed moves according to [](#equation:langevin-discretized) become large. This effectively drops the acceptance rate, making causing a frozen walker in the Metropolis algorithm. Consequently, the energy estimates become noisy and biased. Conversely, when $\Delta t$ is too small, the proposed moves become small. This causes the acceptance rate to approach unity, resulting in unstable energy estimates due to slow exploration of the configuration space.
+
+```{figure} figures/vmc_bose_harmonic_grid_importance_analytic_time_step_dependence.pdf
+:label: figure:vmc-harmonic-importance-time-step-dependence
+:alt: vmc-harmonic-grid-importance-analytic
+:align: center
+
+Grid search energy estimates for the harmonic oscillator obtained using the Metropolis algorithm with importance sampling and analytic local energy, computed for $N=500$ particles in $d=3$ spatial dimensions across different time steps $\Delta t$. All simulations use $10,000$ Monte Carlo cycles.
+```
+
+[](#figure:vmc-harmonic-comparison-brute-importance) ompares the energy estimates obtained with the brute‑force Metropolis algorithm and with importance sampling. The brute‑force estimates are noticeably noisier and exhibit a stronger bias. For our particular experiment, the mean acceptance rate for the brute‑force sampler is approximately $0.73$, whereas importance sampling achieves an acceptance rate close to unity. This indicates that importance sampling reaches the equilibrium distribution more efficiently and therefore requires fewer Monte Carlo cycles to produce stable energy estimates.
+
+```{figure} figures/vmc_bose_harmonic_grid_analytic_numerical.pdf
+:label: figure:vmc-harmonic-comparison-brute-importance
+:alt: vmc-harmonic-comparison-brute-importance
+:align: center
+
+Comparison of grid search energy estimates for the harmonic oscillator obtained using brute-force Metropolis sampler and importance sampling, both employing analytic local-energy evaluations. The simulation is carried out for $N=100$ particles in $d=3$ spatial dimensions, and uses $100,000$ Monte Carlo cycles. The brute-force approach employs a time step $s = 0.01 / \sqrt{N}$, while the importance sampling approach uses a time step $\Delta t = 0.05 / \sqrt{N}$.
+```
+
+### Parameter Optimization using Gradient Descent
+
+To estimate the ground-energy for the harmonic oscillator, we used [](#equation:energy-derivatives) to calculate the energy derivative and applied the steepest-descent method to optimize the variational parameter $\alpha$. [](#table:vmc-harmonic-parameter-optimization) summarizes the results for systems with $N=10, 100, 500$ particles in $3$ dimensions. In all cases, the optimized values of $\alpha$ lie very to the exact value $\alpha = 1/2$, showing that the optimization procedure reliably identifies the correct minimum. The corresponding energy per particle $\braket{E}/N$ is close to the exact value $2/3$, with only small statistical deviations. The estimated biases are also statistically insignificant, indicating that the bootstrap resampling is stable and that the simulations have reached equilibrium.
+
+A recurring observation in our simulations is that the stochastic nature of variational Monte Carlo causes the estimated parameters to fluctuate around the local minimum rather than converging smoothly toward it. This behaviour makes the optimization trajectory noisy and highlights the need for stabilization techniques to counteract the inherent noise in the gradient estimate.
+
+To stabilize the noisy gradient estimates inherent in variational Monte Carlo, we adopted an optimizer combining a warmup–cosine‑decay learning‑rate schedule with adaptive moment estimation (ADAM) and global‑norm clipping. The warmup phase prevents unstable early updates, while the gradual cosine decay reduces step sizes as the optimization approaches the minimum. ADAM's adaptive scaling further smooths stochastic fluctuations, and gradient clipping suppresses rare large updates.
+
+:::{table} Optimized variational energies $\braket{E}$ and corresponding parameter $\alpha$ for the harmonic oscillator with $N$ particles in $d=3$ spatial dimensions. The energies, variances and biases are estimated using bootstrap resampling over a Metropolis importance sampling run of $2^20$ Monte Carlo cycles with a time step $\Delta t = 0.05 / \sqrt{N}$.
+:label: table:vmc-harmonic-parameter-optimization
+:align: center
+
+| $N$ | $\alpha$ | $\braket{E}/N$ | $\operatorname{var}(E)/N$ | $\operatorname{bias}(E)/N$ |
+|---|---|---|---|---|
+| 10 | 0.5016 | 1.5000 | 4.998e-07 | -2.376e-07 |
+| 100 | 0.5004 | 1.5033 | 1.114e-04 | -1.466e-07 |
+| 500 | 0.5003 | 1.4969 | 1.588e-04 | 3.990e-07 |
+:::
+
+## Interacting Bose Gas
+
+This section presents simulation results obtained using variational Monte Carlo to estimate the ground‑state energy of a repulsively interacting Bose gas.
+
+### Parameter Grid Search using Metropolis Importance Sampling
+
+To estimate the ground-state energy for the interacting Bose gas, we performed grid search over $\alpha$ while keeping the anisotropy fixed at $\beta = \gamma = 2.82843$ and the characteristic length at $a = 0.0043$. Figure [](#figure:vmc-repulsive_grid-importance-analytic) shows that energy curves attain their minima for $\alpha < 1/2$. As the particles number increses, the optimal $\alpha$ shift to smaller values, and the corresponding per-particle energy rises. 
+
+A lower $\alpha$ indicates that the Gaussian factor in the the wavefunction [](#equation:trial-wavefunction) becomes broader, effictelvely producing a weaker confinement within the elliptic trap. This describes an expansion of the condensate due to repulsive interactions. The increase in total energy indicates that the interaction energy grows more rapidly than the reduction in kinetic energy gained from this expansion.
+
+```{figure} figures/vmc_bose_repulsive_grid_importance_analytic.pdf
+:label: figure:vmc-repulsive_grid-importance-analytic
+:alt: vmc-repulsive_grid-importance-analytic
+:align: center
+
+Grid search energy estimates for the interacting Bose gas obtained using Metropolis importance sampling with analytic local energies for $N=10, 100, 500$ particle. All simulations use $100,000$ Monte Carlo cycles and a time step $\Delta t = 0.05$.
+```
+
+### Parameter Optimization using Gradient Descent
+
+Following the same optimization procedure as for the harmonic oscillator, we estimated the ground-state energy of the repulsively Bose gas by combining variational Monte Carlo estimation and steepest descent. The results for systesms with $N=10, 100, 500$ particles in $3$ dimensions are summarized in [](#table:vmc-repulsive-parameter-optimization). 
+
+In contrast to the non-interacting case, the optimized values of $\alpha$ decreases systematically with increasing particle number, reflecting the expected expansion of the condensate driven by repulsive Jastrow correlations. The corresponding energy per particle $\braket{E}/N$ rises with $N$, consistent with the growing contribution of the interaction energy. The statistical variances reamin small relative to the total energy, and the estimated biases are negligible, indicating that the bootstrap analysis is stable and that the simulation have reached equilibrium.
+
+:::{table} Optimized variational energies $\braket{E}$ and corresponding parameter $\alpha$ for the repulsively interacting Bose gas with $N$ particles. The energies, variances and biases are estimated using bootstrap resampling over a Metropolis importance sampling run of $2^20$ Monte Carlo cycles with a time step $\Delta t = 0.05 / \sqrt{N}$.
+:label: table:vmc-repulsive-parameter-optimization
+:align: center
+
+| $N$ | $\alpha$ | $\braket{E}$ | $\operatorname{var}(E)$ | $\operatorname{bias}(E)$ |
+|---|---|---|---|---|
+| 10 | 0.4937 | 24.3296 | 2.596e-03 | 6.281e-05 |
+| 100 | 0.4530 | 268.7124 | 2.051e-02 | -5.600e-04 |
+| 500 | 0.3676 | 1782.0651 | 8.337e-02 | 5.523e-03 |
+:::
+
+# Conclusions
+
+To assess the efficiency of different sampling strategies in variational Monte Carlo, we evaluated the ground‑state energy of the harmonic oscillator using both the brute‑force Metropolis algorithm and the importance‑sampling variant based on Langevin dynamics. The two approaches differ primarily in how proposed moves are generated: brute‑force Metropolis relies on symmetric random displacements, while importance sampling incorporates drift terms that guide the walker toward regions of high probability density. This distinction has direct consequences for acceptance rates, sampling efficiency, and ultimately the stability of the energy estimates.
+
+Using variational Monte Carlo combined with steepest‑descent optimization, we determined the optimal Gaussian confinement parameter for both the non‑interacting harmonic oscillator and the repulsively interacting Bose gas. For the harmonic oscillator, the method successfully recovered the expected variational minimum, demonstrating that the implementation reliably identifies the correct local energy minima. For the interacting system, the optimization revealed the characteristic broadening of the condensate induced by repulsive correlations, reflected in a systematic shift of the optimal confinement parameter to smaller values as the particle number increases. The corresponding rise in ground‑state energy is consistent with the growing contribution of interaction energy, which outweighs the reduction in kinetic energy associated with the expanded density profile. Together, these results confirm that the variational framework captures both the exact non‑interacting limit and the qualitative physical behavior of repulsively interacting Bose gases.
 
 # Appendix
 
@@ -592,7 +719,7 @@ $$
   \frac{\nabla_k \Psi_T (\mathbf{R})}{\Psi_T (\mathbf{R})} = \frac{\nabla_k \phi(\mathbf{r}_k)}{\phi(\mathbf{r}_k)} + \sum_{j\neq k} \nabla_k u(r_{kj})
 $$
 
-To derive an analytical expression, we first calculate the logarithmic gradient of $\phi(\mathbf{r})$, given by
+To derive an analytic expression, we first calculate the logarithmic gradient of $\phi(\mathbf{r})$, given by
 
 $$
 \label{equation:gaussian-factor-log-gradient}
@@ -758,7 +885,7 @@ $$
 \end{split}
 $$
 
-To obtained a closed analytical form of this expression, we compute the logarithmic gradient and Laplacian of $\phi$. Applying [](#equation:gaussian-factor-log-gradient), we find
+To obtained a closed analytic form of this expression, we compute the logarithmic gradient and Laplacian of $\phi$. Applying [](#equation:gaussian-factor-log-gradient), we find
 
 $$
 \begin{align*}

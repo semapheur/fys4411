@@ -8,11 +8,11 @@ from numpy.typing import NDArray
 from structs import ParameterGrid
 from vmc import GridSearchResult
 
-type CycleCarryBrute = tuple[Array, Array, Array, Array]
-type CycleCarryImportance = tuple[Array, Array, Array, Array, Array]
+type CycleCarryBrute = tuple[Array, Array, Array, Array, Array]
+type CycleCarryImportance = tuple[Array, Array, Array, Array, Array, Array]
 type CycleCarryOptimize[P: NamedTuple] = tuple[Array, Array, Array, Array, P, P]
 type CarryGradientDescent[P: NamedTuple] = tuple[
-  Array, P, P, optax.OptState, Array, Array, Array
+  Array, P, optax.OptState, Array, Array, Array
 ]
 
 
@@ -32,7 +32,7 @@ def metropolis_step_jax[P: NamedTuple](
   step_size: float,
   cycles: int,
   rng_key: jnp.ndarray,
-) -> tuple[Array, Array, Array]:
+) -> tuple[Array, Array, Array, Array]:
   """
   Perform a single Metropolis Monte Carlo step. The function is JIT-compiled with static arguments using JAX
 
@@ -71,7 +71,7 @@ def metropolis_step_jax[P: NamedTuple](
     carry: CycleCarryBrute, carry_key: Array
   ) -> tuple[CycleCarryBrute, Array]:
 
-    position_old, wf_old, energy, energy2 = carry
+    position_old, wf_old, accept_count, energy, energy2 = carry
 
     # Split the random key
     carry_key, walk_key, accept_key = random.split(carry_key, 3)
@@ -91,26 +91,29 @@ def metropolis_step_jax[P: NamedTuple](
     position_old = jnp.where(accept, position_new, position_old)
     wf_old = jnp.where(accept, wf_new, wf_old)
 
+    accept_count = accept_count + accept.astype(jnp.int32)
+
     energy_delta = local_energy(position_old, parameters)
     energy_new = energy + energy_delta
     energy2_new = energy2 + energy_delta**2
 
-    return (position_old, wf_old, energy_new, energy2_new), energy_new
+    return (position_old, wf_old, accept_count, energy_new, energy2_new), energy_new
 
   # Initialize carry
   zero_scalar = jnp.array(0.0)  # Initial energy
-  carry_0 = (position_0, wf_0, zero_scalar, zero_scalar)
+  carry_0 = (position_0, wf_0, jnp.array(0, dtype=jnp.int32), zero_scalar, zero_scalar)
 
   # Iterate over all Monte Carlo cycles
   keys = random.split(rng_key, cycles)
-  (_, _, energy, energy2), energy_accummulator = lax.scan(
+  (_, _, accept_count, energy, energy2), energy_accummulator = lax.scan(
     cycle_step, carry_0, keys
   )
 
   cycle_counts = jnp.arange(1, cycles + 1)
   energies = energy_accummulator / cycle_counts
+  accept_rate = accept_count / cycles
 
-  return energy / cycles, energy2 / cycles, energies
+  return accept_rate, energy / cycles, energy2 / cycles, energies
 
 @jit(static_argnums=(0, 1, 2, 3, 4, 6, 7, 8))
 def metropolis_step_importance_jax[P: NamedTuple](
@@ -124,7 +127,7 @@ def metropolis_step_importance_jax[P: NamedTuple](
   diffusion_coefficient: float,
   cycles: int,
   rng_key: Array,
-) -> tuple[Array, Array, Array]:
+) -> tuple[Array, Array, Array, Array]:
 
     # Precompute constants
   dt_sqrt = jnp.sqrt(time_step)
@@ -143,7 +146,7 @@ def metropolis_step_importance_jax[P: NamedTuple](
     carry: CycleCarryImportance, carry_key: Array
   ) -> tuple[CycleCarryImportance, Array]:
 
-    position_old, wf_old, force_old, energy, energy2 = carry
+    position_old, wf_old, force_old, accept_count, energy, energy2 = carry
 
     walk_key, accept_key = random.split(carry_key)
 
@@ -170,6 +173,8 @@ def metropolis_step_importance_jax[P: NamedTuple](
     wf_old = jnp.where(accept, wf_new, wf_old)
     force_old = jnp.where(accept, force_new, force_old)
 
+    accept_count = accept_count + accept.astype(jnp.int32)
+
     energy_delta = local_energy(position_old, parameters)
     energy_new = energy + energy_delta
     energy2_new = energy2 + energy_delta**2
@@ -178,6 +183,7 @@ def metropolis_step_importance_jax[P: NamedTuple](
       position_old,
       wf_old,
       force_old,
+      accept_count,
       energy_new,
       energy2_new,
     ), energy_new
@@ -188,13 +194,14 @@ def metropolis_step_importance_jax[P: NamedTuple](
     position_0,
     wf_0,
     force_0,
+    jnp.array(0, dtype=jnp.int32),
     zero_scalar,
     zero_scalar,
   )
 
   # Iterate over all Monte Carlo cycles
   cycle_keys = random.split(cycle_key, cycles)
-  (_, _, _, energy, energy2), energy_accumulator = lax.scan(
+  (_, _, _, accept_count, energy, energy2), energy_accumulator = lax.scan(
     cycle_step,
     carry_0,
     cycle_keys,
@@ -202,8 +209,9 @@ def metropolis_step_importance_jax[P: NamedTuple](
 
   cycle_counts = jnp.arange(1, cycles + 1)
   energies = energy_accumulator / cycle_counts
+  accept_rate = accept_count / cycles
 
-  return energy / cycles, energy2 / cycles, energies
+  return accept_rate, energy / cycles, energy2 / cycles, energies
 
 @jit(static_argnums=(0, 1, 2, 3, 4, 5, 7, 8, 9))
 def metropolis_step_optimization_jax[P: NamedTuple](
@@ -328,7 +336,7 @@ class MetropolisJAX[P: NamedTuple]:
     diffusion_coefficient: float,
     cycles: int,
     seed: int = 0,
-  ) -> tuple[Array, Array, Array]:
+  ) -> tuple[Array, Array, Array, Array]:
     rng_key = random.PRNGKey(seed)
 
     return metropolis_step_importance_jax(
@@ -348,7 +356,7 @@ class MetropolisJAX[P: NamedTuple]:
     self,
     parameter_grid: PG,
     cycles: int,
-    run_one: Callable[[P, Array], tuple[Array, Array, Array]],
+    run_one: Callable[[P, Array], tuple[Array, Array, Array, Array]],
     seed: int = 0,
   ) -> GridSearchResult[P]:
     params_list = parameter_grid.combos()
@@ -364,7 +372,7 @@ class MetropolisJAX[P: NamedTuple]:
     batched_run = vmap(run_one)
 
     # Run Monte Carlo simulation
-    energies, energies2, _ = batched_run(batched_params, rng_keys)
+    accept_rates, energies, energies2, _ = batched_run(batched_params, rng_keys)
 
     variances = energies2 - energies**2
     error = jnp.sqrt(jnp.abs(variances) / cycles)
@@ -374,6 +382,7 @@ class MetropolisJAX[P: NamedTuple]:
       energies=np.array(energies),
       variances=np.array(variances),
       errors=np.array(error),
+      accept_rates=np.array(accept_rates)
     )
 
   def grid_search_brute[PG: ParameterGrid[P]](
@@ -476,7 +485,7 @@ class MetropolisJAX[P: NamedTuple]:
 
     return self._grid_search(parameter_grid, cycles, run_one, seed)
 
-  @jit(static_argnums=(0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13))
+  @jit(static_argnums=(0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12))
   def optimize(
     self,
     log_wavefunction: Callable[[Array, P], Array],
@@ -489,23 +498,20 @@ class MetropolisJAX[P: NamedTuple]:
     cycles: int,
     optimization_iterations: int,
     optimizer: optax.GradientTransformation,
-    gradient_tolerance: float = 1e-2,
-    ema_decay: float = 0.95,
+    gradient_tolerance: float = 1e-3,
     seed: int = 0,
   ):
-    optimizer_clipped = optax.chain(
-      optax.clip_by_global_norm(1.0),
-      optimizer
-    )
-    optimizer_state = optimizer_clipped.init(parameters)
+
+
+    optimizer_state = optimizer.init(parameters)
     rng = random.PRNGKey(seed)
 
     def condition(carry: CarryGradientDescent[P]):
-      i, _, _, _, _, _, gradient_norm = carry
+      i, _, _, _, _, gradient_norm = carry
       return (gradient_norm > gradient_tolerance) & (i < optimization_iterations)
 
     def update_step(carry: CarryGradientDescent[P]):
-      i, params, params_ema, opt_state, rng, _, _ = carry
+      i, params, opt_state, rng, _, _ = carry
 
       key_step, rng_next = random.split(rng)
 
@@ -524,17 +530,14 @@ class MetropolisJAX[P: NamedTuple]:
       )
 
       # Calculate gradient norm to test convergence
-      gradient_norm = optax.global_norm(energy_gradient)
+      energy_gradient_normalized = tree_util.tree_map(
+        lambda g: g / float(self.number_particles), energy_gradient
+      )
+      gradient_norm = optax.global_norm(energy_gradient_normalized)
 
       # Update optimizer state and parameters
-      updates, opt_state_next = optimizer_clipped.update(energy_gradient, opt_state, params)
+      updates, opt_state_next = optimizer.update(energy_gradient_normalized, opt_state, params)
       params_next = optax.apply_updates(params, updates)
-
-      # Exponential moving average update to smooth out stochastic noise
-      params_ema_next = tree_util.tree_map(
-        lambda ema, p: ema_decay * ema + (1.0 - ema_decay)  * p, params_ema, params_next
-      )
-
 
       # Print progress
       def print_fn():
@@ -542,16 +545,16 @@ class MetropolisJAX[P: NamedTuple]:
           "iteration {i}/{t}: E={e:.2f}, grad={g:.3e}, {p}",
           i=i,
           t=optimization_iterations,
-          e=energy,
+          e=energy / float(self.number_particles),
           g=gradient_norm,
-          p=params_ema_next,
+          p=params_next,
         )
 
       lax.cond(i % 10 == 0, print_fn, lambda: None)
 
-      return i + 1, params_next, params_ema_next, opt_state_next, rng_next, energy, gradient_norm
+      return i + 1, params_next, opt_state_next, rng_next, energy, gradient_norm
 
-    carry_init = (0, parameters, parameters, optimizer_state, rng, jnp.array(0.0), jnp.array(1.0))
+    carry_init = (0, parameters, optimizer_state, rng, jnp.array(0.0), jnp.array(jnp.inf))
     final_state = (
       lax.while_loop(
         condition,
@@ -559,14 +562,14 @@ class MetropolisJAX[P: NamedTuple]:
         carry_init,
       )
     )
-    final_iteration, params_final, params_ema_final, _, _, energy_final, gradient_norm_final = final_state
+    final_iteration, params_final, _, _, energy_final, gradient_norm_final = final_state
 
     debug.print(
-      "Finished at iteration {i}: E (ema)={e:.2f}, grad={g:.3e}, {p}",
+      "Finished at iteration {i}: E={e:.2f}, grad={g:.3e}, {p}",
       i=final_iteration,
-      e=energy_final,
+      e=energy_final / self.number_particles,
       g=gradient_norm_final,
       p=params_final,
     )
 
-    return energy_final, params_ema_final
+    return energy_final, params_final

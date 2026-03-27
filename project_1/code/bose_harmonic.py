@@ -18,12 +18,6 @@ class HarmonicParamGrid(ParameterGrid[HarmonicParams]):
   alpha: NDArray[np.floating]
 
 
-@njit(fastmath=True)
-def wavefunction(positions: NDArray[np.floating], params: HarmonicParams) -> float:
-  alpha = params.alpha
-  r2 = np.sum(positions**2)
-
-  return np.exp(-alpha * r2)
 
 
 @njit(fastmath=True)
@@ -32,6 +26,11 @@ def log_wavefunction(positions: NDArray[np.floating], params: HarmonicParams) ->
   r2 = np.sum(positions**2)
 
   return -alpha * r2
+
+
+@njit(fastmath=True)
+def wavefunction(positions: NDArray[np.floating], params: HarmonicParams) -> float:
+  return np.exp(log_wavefunction(positions, params))
 
 
 @njit(fastmath=True)

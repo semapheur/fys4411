@@ -11,7 +11,7 @@ class BoseParams(NamedTuple):
   a: Array
 
 
-def wavefunction_jax(positions: Array, params: BoseParams):
+def log_wavefunction_jax(positions: Array, params: BoseParams) -> Array:
   alpha, beta, _, a = params
 
   # Single particle factor
@@ -50,10 +50,13 @@ def wavefunction_jax(positions: Array, params: BoseParams):
   violates = jnp.any(violates_vec)
 
   # Compute wavefunction
-  log_psi = log_single_particle + log_jastrow_factor
-  psi = jnp.exp(log_psi)
+  log_wf = log_single_particle + log_jastrow_factor
 
-  return jnp.where(violates, 0.0, psi)
+  return jnp.where(violates, -jnp.inf, log_wf) # check hard-core condition
+
+
+def wavefunction_jax(positions: Array, params: BoseParams) -> Array:
+  return jnp.exp(log_wavefunction_jax(positions, params))
 
 
 def wavefunction_derivative_jax(positions: Array, params: BoseParams) -> BoseParams:

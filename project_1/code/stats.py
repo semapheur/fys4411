@@ -1,5 +1,7 @@
 from typing import Callable, NamedTuple
 
+from jax import Array
+import jax.numpy as jnp
 import numpy as np
 from numpy.typing import NDArray
 from numba import njit
@@ -46,7 +48,6 @@ def timeseries_bootstrap(
     bias=float(statistic_mean - statistic(data)),
     standard_error=float(np.std(statistic_store)),
   )
-
 
 def blocking(data: NDArray[np.floating]):
 

@@ -38,3 +38,33 @@ class ParameterGrid[P: NamedTuple]:
       combo_typedlist.append(combo)
 
     return combo_typedlist
+
+class OptimizationRecord(NamedTuple):
+  n: int
+  alpha: float
+  mean: float
+  error: float
+  bias: float
+
+def records_to_markdown[P: NamedTuple](records: list[P], field_map: dict[str, tuple[str, str|None]]) -> str:
+
+  fields = records[0]._fields
+
+  headers = [field_map[f][0] for f in fields]
+  md = "| " + " | ".join(headers) + " |\n"
+  md += "|" + "|".join(["---"] * len(headers)) + "|\n"
+
+  for r in records:
+    row: list[str] = []
+    for f in fields:
+      value = getattr(r, f)
+      fmt = field_map[f][1]
+
+      if isinstance(value, float) and fmt is not None:
+        row.append(format(value, fmt))
+      else:
+        row.append(str(value))
+      
+    md += "| " + " | ".join(row) + " |\n"
+  
+  return md

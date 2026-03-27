@@ -2,24 +2,20 @@ from typing import NamedTuple
 
 import jax.numpy as jnp
 from jax import Array, grad, jvp, vmap
-from utils import gradient_finite_diff_jax, laplacian_finite_diff_jax
 
 
 class HarmonicParams(NamedTuple):
   alpha: Array
 
 
-def wavefunction_jax(positions: Array, params: HarmonicParams) -> Array:
-  alpha = params.alpha
-  r2 = jnp.sum(positions**2)
-
-  return jnp.exp(-alpha * r2)
-
 def log_wavefunction_jax(positions: Array, params: HarmonicParams) -> Array:
   alpha = params.alpha
   r2 = jnp.sum(positions**2)
 
   return -alpha * r2
+
+def wavefunction_jax(positions: Array, params: HarmonicParams) -> Array:
+  return jnp.exp(log_wavefunction_jax(positions, params))
 
 
 def wavefunction_derivative_jax(
