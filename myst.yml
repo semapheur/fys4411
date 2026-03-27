@@ -1,0 +1,15 @@
+# See docs at: https://mystmd.org/guide/frontmatter
+version: 1
+project:
+  id: 57c6739a-86f2-4615-8f68-b525fc6b747b
+  # title:
+  # description:
+  # keywords: []
+  # authors: []
+  github: https://github.com/semapheur/fys4411
+  # To autogenerate a Table of Contents, run "myst init --write-toc"
+site:
+  template: book-theme
+  # options:
+  #   favicon: favicon.ico
+  #   logo: site_logo.png
