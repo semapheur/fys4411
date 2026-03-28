@@ -235,6 +235,38 @@ $$
 \end{split}
 $$
 
+### One-body Density
+
+For a many-body system of $N$ particles represented by a normalized wavefunction $\Psi_T$, the one-body reduced density associated with particle $i$ is defined as the marginal of the probability measure $|\Psi_T|^2 \drm\mathbf{r}_1 \cdots \drm\mathbf{r}_N$ onto the $i$th coordinate
+
+$$
+  \rho_i (\mathbf{r}) = N \int_{\R^{3(N-1)}} |\Psi(\mathbf{r}_1,\dots,\mathbf{r}_{i-1},\mathbf{r},\mathbf{r}_{i+1},\dots,\mathbf{r}_N)|^2 \; \prod_{j\neq i} \drm\mathbf{r}_j
+$$
+
+The radial probability density is defined with respect to the radial coordinate $r = |\mathbf{r}|$, obtained by integrating over angular variables
+
+$$
+  P(r) := \int_{S^2} \rho(\mathbf{r}) r^2 \d\Omega
+$$
+
+Under spherical symmetry, this reduces to $P(r) = 4\pi r^2 \rho(r)$. For a spherical trap with $\beta = 1$ in a non-interacting system, the one-body density is given by 
+
+$$
+  \phi(\mathbf{r}) = N \left(\frac{2\alpha}{\pi} \right)^{3/2} e^{-2\alpha r^2},
+$$
+
+with radial probability density function
+
+$$
+  P(r) = 4\pi r^2 N \left(\frac{2\alpha}{\pi} \right)^{3/2} e^{-2\alpha r^2} = \frac{N}{\sqrt{\pi}} 2^{7/2} \alpha^{3/2} r^2 e^{-2\alpha r^2}a
+$$
+
+For the harmonic oscillator ground state with $\alpha = 1/2$, this reduces to
+
+$$
+  P(r) = \frac{4N}{\sqrt{\pi}} r^2 e^{-r^2}
+$$
+
 ## Variational Monte Carlo Estimation
 
 The ground state energy of the bose gas correlated model can be estimated using variational Monte Carlo methods. For a trial wavefunction $\Psi_T (\mathbf{R}; \boldsymbol{\alpha})$, the variational energy is defined as the expectation value of the Hamiltonian $\hat{H}$:
@@ -908,6 +940,47 @@ $$
   &- 4\alpha a \sum_{j\neq k} \frac{(x_k - x_j)x_k + (y_k - y_j)y_k + \beta(z_k - z_j)z_k}{r_{kj} (r_{kj}^2 - ar_{kj})} \\
   &+ a^2 \sum_{i\neq k} \sum_{j\neq k} \frac{(\mathbf{r}_k - \mathbf{r}_i)\cdot(\mathbf{r}_k - \mathbf{r}_j)}{r_{ki} r_{kj} (r_{ki}^2 - ar_{ki})(r_{kj}^2 - ar_{kj})} \\
   &- a^2 \sum_{j\neq k} \frac{1}{r_{kj}^2 (r_{kj} - a)^2}
+\end{align*}
+$$
+
+## One-body Density in the Non-Interacting System
+
+For a spherical trap with $\beta = 1$ in a non-interacting system, the normalized trial function takes the form
+
+$$
+  \Psi_T (\mathbf{r}_1,\dots,\mathbf{r}_N; \alpha) = \prod_{i=1}^N A e^{-er_i^2}
+$$
+
+with probability density
+
+$$
+  |\Psi_T|^2 = |A|^{2N} \prod_{i=1}^N e^{-2\alpha r_i^2}
+$$
+
+The one-body function $\phi(\mathbf{r}) = A \exp(-\alpha r^2)$ must satisfy
+
+$$
+  \int_{\R^3} |\phi(\mathbf{r})|^2 \;\drm\mathbf{r} = |A|^2 \int_{\R^3} e^{-2\alpha r^2} \;\d\mathbf{r} = 1
+$$
+
+Using
+
+$$
+  \int_{\R^3} e^{-2\alpha r^2} \;\drm\mathbf{r} = \left(\frac{\pi}{2\alpha} \right)^{3/2},
+$$
+
+we obtain the the normalization constant
+
+$$
+  |A|^2 = \left(\frac{2\alpha}{\pi}\right)^{3/2}.
+$$
+
+The one-body density is then given by
+
+$$
+\begin{align*}
+  \rho(\mathbf{r}) =& N \int_{\R^{3(N-1)}} |\Psi_T (\mathbf{r},\mathbf{r}_2, \dots, \mathbf{r}_N)|^2 \;\drm\mathbf{r}_2 \cdots \drm\mathbf{r}_N \\
+  =& N|\phi(\mathbf{r})|^2 \prod_{j=2}^N \underbrace{\left(\int_{\R^3} |\phi(\mathbf{r}_j)|^2 \right)}_{=1} \;\drm \mathbf{r}_j = N \left(\frac{2\alpha}{\pi} \right)^{3/2} e^{-2\alpha r^2}
 \end{align*}
 $$
 
