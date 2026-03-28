@@ -5,7 +5,7 @@ import numpy as np
 from numba import njit
 from numpy.typing import NDArray
 from structs import ParamConstructor, ParameterGrid
-from utils import gradient_finite_diff, laplacian_finite_diff
+from diff import gradient_finite_diff, laplacian_finite_diff
 
 
 class HarmonicParams(NamedTuple):
@@ -16,8 +16,6 @@ class HarmonicParams(NamedTuple):
 class HarmonicParamGrid(ParameterGrid[HarmonicParams]):
   param_type: ParamConstructor[HarmonicParams]
   alpha: NDArray[np.floating]
-
-
 
 
 @njit(fastmath=True)

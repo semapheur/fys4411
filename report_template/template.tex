@@ -23,6 +23,7 @@
 \usepackage{natbib}
 \usepackage{siunitx}
 \usepackage[dvipsnames]{xcolor}
+\usepackage{tocloft}
 
 [-IMPORTS-]
 
@@ -36,21 +37,21 @@
 \definecolor{codepurple}{rgb}{0.58,0,0.82}
 \definecolor{backcolour}{rgb}{0.95,0.95,0.92}
 \lstdefinestyle{mystyle}{
-    backgroundcolor=\color{backcolour},   
+    backgroundcolor=\color{backcolour},
     commentstyle=\color{codepurple},
     keywordstyle=\color{NavyBlue},
     numberstyle=\tiny\color{codegray},
     stringstyle=\color{codepurple},
     basicstyle=\ttfamily\footnotesize\bfseries,
-    breakatwhitespace=false,         
-    breaklines=true,                 
-    captionpos=t,                    
-    keepspaces=true,                 
-    numbers=left,                    
-    numbersep=5pt,                  
-    showspaces=false,                
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=t,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
     showstringspaces=false,
-    showtabs=false,                  
+    showtabs=false,
     tabsize=2
 }
 \lstset{style=mystyle}
@@ -58,8 +59,13 @@
 %\titleformat{\title}[block]{}{ \bfseries \LARGE}{}{}
 %\titlespacing*{\title}{0pt}{0pt}{0pt}
 
+% paragraph formatting
 \setlength{\parskip}{1em}
 \setlength{\parindent}{0pt}
+
+% table of contents formatting
+\setlength{\cftbeforesecskip}{0pt
+\setlength{\cftaftertoctitleskip}{0pt}
 
 % colors for hyperlinks
 \hypersetup{colorlinks=true, allcolors=blue}
@@ -67,15 +73,33 @@
 % date format
 \renewcommand{\dateseparator}{-}
 
-\title{\vspace{-2.5cm} 
-  [-doc.title-] 
-  [# if doc.subtitle #] 
-    \\[0.5em] \large [-doc.subtitle-] 
+% tutke
+\title{\vspace{-2.5cm}
+  [-doc.title-]
+  [# if doc.subtitle #]
+    \\[0.5em] \large [-doc.subtitle-]
   [# endif #]
 }
-\author{[-doc.authors|join(" \\and ", "name")-]}
-\affil{[-doc.authors|join(" \\and ", "affiliation")-]}
+
+% authors
+[# for author in doc.authors -#]
+\author[
+[#- if author.orcid #] \orcidlink{[- author.orcid -]} [# endif -#]
+[-- author.affiliations|join(", ", "index") --]
+[#- if author.corresponding #] \Letter[# endif -#]
+]{[-- author.name --]}
+[# endfor #]
+
+% affiliations
+[# for affiliation in doc.affiliations #]
+\affil[[-affiliation.index-]]{[-affiliation.value.name-]}
+[# endfor #]
+
 \date{\yyyymmdddate\today}
+
+[# if doc.keywords #]
+\metadata[]{Keywords}{[-doc.keywords|join("; ")-]}
+[# endif #]
 
 \begin{document}
 

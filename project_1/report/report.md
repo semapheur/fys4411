@@ -274,13 +274,13 @@ is intractable in high dimensions, making direct sampling from $P_{\boldsymbol{\
 Given the current state $\mathbf{R}$, we propose a move $\mathbf{R}' \sim T(\cdot|\mathbf{R})$, where $T$ is a chosen transition kernel. The proposal is accepted with probability
 
 $$
-  A(\mathbf{R},\mathbf{R}') = \min\Set{1, \frac{|\Psi_T (\mathbf{R}', \boldsymbol{\alpha})|^2 T(\mathbf{R}|\mathbf{R}')}{|\Psi_T (\mathbf{R}, \boldsymbol{\alpha})|^2 T(\mathbf{R}' |\mathbf{R})}}
+  A(\mathbf{R},\mathbf{R}') = \min\Set{1, \frac{\lvert\Psi_T (\mathbf{R}', \boldsymbol{\alpha})\rvert^2 T(\mathbf{R} \lvert \mathbf{R}')}{\lvert\Psi_T (\mathbf{R}, \boldsymbol{\alpha})\rvert^2 T(\mathbf{R}' \lvert \mathbf{R})}}
 $$
 
 If the transition kernel is symmetric, i.e. $T(\mathbf{R}' | \mathbf{R}) = T(\mathbf{R}|\mathbf{R}')$, the acceptance probability simplifies to
 
 $$
-  A(\mathbf{R},\mathbf{R}') = \min\Set{1, \frac{|\Psi_T (\mathbf{R}', \boldsymbol{\alpha})|^2}{|\Psi_T (\mathbf{R}, \boldsymbol{\alpha})|^2}},
+  A(\mathbf{R},\mathbf{R}') = \min\Set{1, \left\lvert\frac{\Psi_T (\mathbf{R}', \boldsymbol{\alpha})}{\Psi_T (\mathbf{R}, \boldsymbol{\alpha})}\rvert^2},
 $$
 
 This special case corresponds to the original algorithm by [](article_metropolis_etal_1953), referred to as the *Metropolis algorithm*.
@@ -300,7 +300,7 @@ Given parameters $\boldsymbol{\alpha}$:
     - Propose a new configurations $\mathbf{R}' \sim T(\cdot|\mathbf{R}^{(k)})$
     - Compute the acceptance ratio
 $$
-  A = \frac{|\Psi_T (\mathbf{R}', \boldsymbol{\alpha})|^2}{|\Psi_T (\mathbf{R}^{(k)}, \boldsymbol{\alpha})|^2}
+  A = \left|\frac{\Psi_T (\mathbf{R}', \boldsymbol{\alpha})}{\Psi_T (\mathbf{R}^{(k)}, \boldsymbol{\alpha})}\right|^2
 $$
 
     - Accept or reject:
@@ -368,10 +368,10 @@ $$
 The acceptance probability for the Metropolis-Hastings algorithm now becomes
 
 $$
-  A(\mathbf{R}, \mathbf{R}') = \min\Set{1, \frac{G(\mathbf{R}, \mathbf{R}', \Delta t) |\Psi_T (\mathbf{R}')|^2}{G(\mathbf{R}', \mathbf{R}, \Delta t) |\Psi_T (\mathbf{R})|^2}}
+  A(\mathbf{R}, \mathbf{R}') = \min\Set{1, \frac{G(\mathbf{R}, \mathbf{R}', \Delta t) \lvert\Psi_T (\mathbf{R}')\rvert^2}{G(\mathbf{R}', \mathbf{R}, \Delta t) \lvert\Psi_T (\mathbf{R})\rvert^2}}
 $$
 
-Introducing
+Introducing the shorthand
 
 $$
 \begin{equation*}
@@ -542,7 +542,7 @@ To estimate the ground-energy for the harmonic oscillator, we used [](#equation:
 
 A recurring observation in our simulations is that the stochastic nature of variational Monte Carlo causes the estimated parameters to fluctuate around the local minimum rather than converging smoothly toward it. This behaviour makes the optimization trajectory noisy and highlights the need for stabilization techniques to counteract the inherent noise in the gradient estimate.
 
-To stabilize the noisy gradient estimates inherent in variational Monte Carlo, we adopted an optimizer combining a warmup–cosine‑decay learning‑rate schedule with adaptive moment estimation (ADAM) and global‑norm clipping. The warmup phase prevents unstable early updates, while the gradual cosine decay reduces step sizes as the optimization approaches the minimum. ADAM's adaptive scaling further smooths stochastic fluctuations, and gradient clipping suppresses rare large updates.
+To stabilize the noisy gradient estimates inherent in variational Monte Carlo, we adopted an optimizer combining a warmup–cosine-decay learning‑rate schedule with adaptive moment estimation (ADAM) and global-norm clipping. The warmup phase prevents unstable early updates, while the gradual cosine decay reduces step sizes as the optimization approaches the minimum. ADAM's adaptive scaling further smooths stochastic fluctuations, and gradient clipping suppresses rare large updates.
 
 :::{table} Optimized variational energies $\braket{E}$ and corresponding parameter $\alpha$ for the harmonic oscillator with $N$ particles in $d=3$ spatial dimensions. The energies, variances and biases are estimated using bootstrap resampling over a Metropolis importance sampling run of $2^20$ Monte Carlo cycles with a time step $\Delta t = 0.05 / \sqrt{N}$.
 :label: table:vmc-harmonic-parameter-optimization
@@ -583,11 +583,11 @@ In contrast to the non-interacting case, the optimized values of $\alpha$ decrea
 :label: table:vmc-repulsive-parameter-optimization
 :align: center
 
-| $N$ | $\alpha$ | $\braket{E}$ | $\operatorname{var}(E)$ | $\operatorname{bias}(E)$ |
+| $N$ | $\alpha$ | $\braket{E}/N$ | $\operatorname{var}(E)/N$ | $\operatorname{bias}(E)/N$ |
 |---|---|---|---|---|
-| 10 | 0.4937 | 24.3296 | 2.596e-03 | 6.281e-05 |
-| 100 | 0.4530 | 268.7124 | 2.051e-02 | -5.600e-04 |
-| 500 | 0.3676 | 1782.0651 | 8.337e-02 | 5.523e-03 |
+| 10 | 0.4937 | 2.4330 | 2.596e-04 | 6.281e-06 |
+| 100 | 0.4530 | 2.6871 | 2.051e-04 | -5.600e-06 |
+| 500 | 0.3676 | 3.5641 | 1.667e-04 | 1.105e-05 |
 :::
 
 # Conclusions

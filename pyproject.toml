@@ -6,7 +6,9 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
   "ipykernel>=7.2.0",
-  "jax[cuda12]>=0.9.1",
+  "jax>=0.9.1",
+  "jax-cuda12-plugin>=0.9.1; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "jax-cuda12-plugin>=0.9.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
   "matplotlib>=3.10.8",
   "numba>=0.64.0",
   "numpy>=2.4.2",

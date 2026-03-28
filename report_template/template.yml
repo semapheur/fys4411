@@ -19,10 +19,11 @@ doc:
   - id: title
     required: true
   - id: subtitle
-    required: false
   - id: authors
     required: true
   - id: bibliography
+  - id: keywords
+  - id: affiliations
 options:
   - id: basefont
     type: string
@@ -65,5 +66,6 @@ packages:
   - natbib
   - siunitx
   - titlesec
+  - tocloft
   - xcolor
 myst: v1
