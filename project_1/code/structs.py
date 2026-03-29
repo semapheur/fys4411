@@ -39,6 +39,7 @@ class ParameterGrid[P: NamedTuple]:
 
     return combo_typedlist
 
+
 class OptimizationRecord(NamedTuple):
   n: int
   alpha: float
@@ -46,7 +47,10 @@ class OptimizationRecord(NamedTuple):
   error: float
   bias: float
 
-def records_to_markdown[P: NamedTuple](records: list[P], field_map: dict[str, tuple[str, str|None]]) -> str:
+
+def records_to_markdown[P: NamedTuple](
+  records: list[P], field_map: dict[str, tuple[str, str | None]]
+) -> str:
 
   fields = records[0]._fields
 
@@ -61,10 +65,12 @@ def records_to_markdown[P: NamedTuple](records: list[P], field_map: dict[str, tu
       fmt = field_map[f][1]
 
       if isinstance(value, float) and fmt is not None:
-        row.append(format(value, fmt))
+        row.append(rf"$\num{format(value, fmt)}$")
+      elif isinstance(value, (float, int)):
+        row.append(f"${value}$")
       else:
         row.append(str(value))
-      
+
     md += "| " + " | ".join(row) + " |\n"
-  
+
   return md
