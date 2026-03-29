@@ -243,28 +243,16 @@ $$
   \rho_i (\mathbf{r}) = N \int_{\R^{3(N-1)}} |\Psi(\mathbf{r}_1,\dots,\mathbf{r}_{i-1},\mathbf{r},\mathbf{r}_{i+1},\dots,\mathbf{r}_N)|^2 \; \prod_{j\neq i} \drm\mathbf{r}_j
 $$
 
-The radial probability density is defined with respect to the radial coordinate $r = |\mathbf{r}|$, obtained by integrating over angular variables
+Since bosonic states are symmetric, the $\rho_i$ are independent of the particle label $i$, and we simply write $\rho(\mathbf{r})$. In a spherical trap with $\beta = 1$ without interactions, the one-body density takes the form
 
 $$
-  P(r) := \int_{S^2} \rho(\mathbf{r}) r^2 \d\Omega
+  \rho(\mathbf{r}) = N \left(\frac{2\alpha}{\pi} \right)^{3/2} e^{-2\alpha r^2}\; r = |\mathbf{r}|.
 $$
 
-Under spherical symmetry, this reduces to $P(r) = 4\pi r^2 \rho(r)$. For a spherical trap with $\beta = 1$ in a non-interacting system, the one-body density is given by 
+In particular, the harmonic oscillator ground state corresponds to $\alpha = 1/2$, resulting in the one-body density
 
 $$
-  \phi(\mathbf{r}) = N \left(\frac{2\alpha}{\pi} \right)^{3/2} e^{-2\alpha r^2},
-$$
-
-with radial probability density function
-
-$$
-  P(r) = 4\pi r^2 N \left(\frac{2\alpha}{\pi} \right)^{3/2} e^{-2\alpha r^2} = \frac{N}{\sqrt{\pi}} 2^{7/2} \alpha^{3/2} r^2 e^{-2\alpha r^2}a
-$$
-
-For the harmonic oscillator ground state with $\alpha = 1/2$, this reduces to
-
-$$
-  P(r) = \frac{4N}{\sqrt{\pi}} r^2 e^{-r^2}
+  \rho(r) = \frac{N}{\pi^{3/2}} e^{-r^2}
 $$
 
 ## Variational Monte Carlo Estimation

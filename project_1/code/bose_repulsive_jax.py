@@ -1,6 +1,6 @@
 from typing import NamedTuple
 
-from jax import Array, ops, vmap
+from jax import Array, vmap
 import jax.numpy as jnp
 
 
@@ -52,7 +52,7 @@ def log_wavefunction_jax(positions: Array, params: BoseParams) -> Array:
   # Compute wavefunction
   log_wf = log_single_particle + log_jastrow_factor
 
-  return jnp.where(violates, -jnp.inf, log_wf) # check hard-core condition
+  return jnp.where(violates, -jnp.inf, log_wf)  # check hard-core condition
 
 
 def wavefunction_jax(positions: Array, params: BoseParams) -> Array:

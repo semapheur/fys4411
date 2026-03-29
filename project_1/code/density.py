@@ -2,25 +2,24 @@ import numpy as np
 from numpy.typing import NDArray
 
 
-def radial_onebody_density(
-  positions: NDArray[np.floating], r_max: float, bins: int
+def radial_density(
+  positions: NDArray[np.floating], max_radius: float, bins: int, bin_scaling: float
 ) -> tuple[NDArray[np.floating], NDArray[np.floating]]:
 
   flat_positions = positions.reshape(-1, positions.shape[-1])
-  radial_distance = np.linalg.norm(flat_positions, axis=1)
-  counts, bin_edges = np.histogram(radial_distance, bins=bins, range=(0.0, r_max))
+  radii = np.linalg.norm(flat_positions, axis=1)
 
-  r_centers = 0.5 * (bin_edges[1:] + bin_edges[:-1])
-  dr = bin_edges[1] - bin_edges[0]
+  x = np.linspace(0.0, 1.0, bins + 1)
+  bin_edges = max_radius * x**bin_scaling
+
+  counts, _ = np.histogram(radii, bins=bin_edges)
+
+  bin_centers = 0.5 * (bin_edges[1:] + bin_edges[:-1])
 
   # shell volume for each spherical shell
-  shell_volume = 4 * np.pi * r_centers**2 * dr
-  shell_volume[0] = np.inf  # avoid division by zero at r=0
+  shell_volume = (4 / 3) * np.pi * (bin_edges[1:] ** 3 - bin_edges[:-1] ** 3)
 
-  density = counts / shell_volume
+  n_samples = flat_positions.shape[0]
+  density = counts / (n_samples * shell_volume)
 
-  # normalize so ∫ρ(r) 4πr² dr = 1
-  norm = np.sum(density[1:] * shell_volume[1:])
-  density /= norm
-
-  return r_centers, density
+  return bin_centers, density

@@ -82,3 +82,7 @@ def drift_force_numeric(
   wf_gradient = gradient_finite_diff(wavefunction, position, params)
 
   return 2 * wf_gradient / wf
+
+
+def radial_onebody_density(radii: NDArray[np.floating]) -> float:
+  return (1.0 / np.pi**1.5) * np.exp(-(radii**2))
