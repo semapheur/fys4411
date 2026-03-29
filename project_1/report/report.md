@@ -521,7 +521,7 @@ An observed trend in our simulations is that that the acceptance rate decreases 
 :alt: vmc-harmonic-grid-analytic
 :align: center
 
-Grid search energy estimates for the harmonic oscillator obtained using brute-force Metropolis algorithm with analytical local energy for $N=1,10,100, 500$ particles in $d=1,2, 3$ spatial dimensions. All simulations use $100,000$ Monte Carlo cycles and a scaled step size $s = 1.0 / \sqrt{N}$.
+Grid search energy estimates for the harmonic oscillator obtained using brute-force Metropolis algorithm with analytical local energy for $N=1,10,100,500$ particles in $d=1,2,3$ spatial dimensions. All simulations use $\num{1e5}$ Monte Carlo cycles and a scaled step size $s = 1.0 / \sqrt{N}$.
 ```
 
 We also employed finite difference derivates to compute the logarithmic Laplacian of the trial wavefunction in the local-energy expression [](#equation:local-energy-noninteracting). As shown in [](#figure:vmc_bose_harmonic_grid_analytic_numerical), a random-walk Metropolis sampler using this numerical approach produces energy curves that closely match those obtained with the analytic expression, albeit at a higher computational cost. Benchmarking the computation times shows that the analytic approach is approximately twice as fast as the numerical one. The second-order finite difference derivation [](#equation:second-order-finite-difference) requires two evaluations of the wavefunction $\Psi_T$ in each coordinate direction, and thus scales as $O(2dN)$ operations.  The analytic expression, in comparison, scales as $O(1)$.
@@ -531,7 +531,7 @@ We also employed finite difference derivates to compute the logarithmic Laplacia
 :alt: vmc-harmonic-grid-analytic-numeric
 :align: center
 
-Comparison of grid search energy estimates for the harmonic oscillator obtained using brute-force Metropolis sampler with analytic and numerical local-energy evaluations for $N=100$ particles in $d=3$ spatial dimensions. The simulation uses $1,000,000$ Monte Carlo cycles and step size $s = 1.0 / \sqrt{N}$.
+Comparison of grid search energy estimates for the harmonic oscillator obtained using brute-force Metropolis sampler with analytic and numerical local-energy evaluations for $N=100$ particles in $d=3$ spatial dimensions. The simulation uses $\num{1e6}$ Monte Carlo cycles and step size $s = 1.0 / \sqrt{N}$.
 ```
 
 ### Parameter Grid Search using Metropolis Importance Sampling
@@ -543,7 +543,7 @@ We next applied the Metropolis algorithm with importance sampling to estimate th
 :alt: vmc-harmonic-grid-importance-analytic
 :align: center
 
-Grid search energy estimates for the harmonic oscillator obtained using the Metropolis algorithm with importance sampling and analytic local energy, computed for $N=500$ particles in $d=3$ spatial dimensions across different time steps $\Delta t$. All simulations use $10,000$ Monte Carlo cycles.
+Grid search energy estimates for the harmonic oscillator obtained using the Metropolis algorithm with importance sampling and analytic local energy, computed for $N=500$ particles in $d=3$ spatial dimensions across different time steps $\Delta t$. All simulations use $\num{1e4}$ Monte Carlo cycles.
 ```
 
 [](#figure:vmc-harmonic-comparison-brute-importance) ompares the energy estimates obtained with the brute‑force Metropolis algorithm and with importance sampling. The brute‑force estimates are noticeably noisier and exhibit a stronger bias. For our particular experiment, the mean acceptance rate for the brute‑force sampler is approximately $0.73$, whereas importance sampling achieves an acceptance rate close to unity. This indicates that importance sampling reaches the equilibrium distribution more efficiently and therefore requires fewer Monte Carlo cycles to produce stable energy estimates.
@@ -553,7 +553,7 @@ Grid search energy estimates for the harmonic oscillator obtained using the Metr
 :alt: vmc-harmonic-comparison-brute-importance
 :align: center
 
-Comparison of grid search energy estimates for the harmonic oscillator obtained using brute-force Metropolis sampler and importance sampling, both employing analytic local-energy evaluations. The simulation is carried out for $N=100$ particles in $d=3$ spatial dimensions, and uses $100,000$ Monte Carlo cycles. The brute-force approach employs a time step $s = 0.01 / \sqrt{N}$, while the importance sampling approach uses a time step $\Delta t = 0.05 / \sqrt{N}$.
+Comparison of grid search energy estimates for the harmonic oscillator obtained using brute-force Metropolis sampler and importance sampling, both employing analytic local-energy evaluations. The simulation is carried out for $N=100$ particles in $d=3$ spatial dimensions, and uses $\num{1e5}$ Monte Carlo cycles. The brute-force approach employs a time step $s = 0.01 / \sqrt{N}$, while the importance sampling approach uses a time step $\Delta t = 0.05 / \sqrt{N}$.
 ```
 
 ### Parameter Optimization using Gradient Descent
@@ -564,15 +564,15 @@ A recurring observation in our simulations is that the stochastic nature of vari
 
 To stabilize the noisy gradient estimates inherent in variational Monte Carlo, we adopted an optimizer combining a warmup–cosine-decay learning‑rate schedule with adaptive moment estimation (ADAM) and global-norm clipping. The warmup phase prevents unstable early updates, while the gradual cosine decay reduces step sizes as the optimization approaches the minimum. ADAM's adaptive scaling further smooths stochastic fluctuations, and gradient clipping suppresses rare large updates.
 
-:::{table} Optimized variational energies $\braket{E}$ and corresponding parameter $\alpha$ for the harmonic oscillator with $N$ particles in $d=3$ spatial dimensions. The energies, variances and biases are estimated using bootstrap resampling over a Metropolis importance sampling run of $2^20$ Monte Carlo cycles with a time step $\Delta t = 0.05 / \sqrt{N}$.
+:::{table} Optimized variational energies $\braket{E}$ and corresponding parameter $\alpha$ for the harmonic oscillator with $N$ particles in $d=3$ spatial dimensions. The energies, variances and biases are estimated using bootstrap resampling over a Metropolis importance sampling run of $2^{20}$ Monte Carlo cycles with a time step $\Delta t = 0.05 / \sqrt{N}$.
 :label: table:vmc-harmonic-parameter-optimization
 :align: center
 
 | $N$ | $\alpha$ | $\braket{E}/N$ | $\operatorname{var}(E)/N$ | $\operatorname{bias}(E)/N$ |
 |---|---|---|---|---|
-| 10 | 0.5016 | 1.5000 | 4.998e-07 | -2.376e-07 |
-| 100 | 0.5004 | 1.5033 | 1.114e-04 | -1.466e-07 |
-| 500 | 0.5003 | 1.4969 | 1.588e-04 | 3.990e-07 |
+| $\num{10}$ | $\num{0.5016}$ | $\num{1.5000}$ | $\num{4.998e-07}$ | $\num{-2.376e-07}$ |
+| $\num{100}$ | $\num{0.5004}$ | $\num{1.5033}$ | $\num{1.114e-04}$ | $\num{-1.466e-07}$ |
+| $\num{500}$ | $\num{0.5003}$ | $\num{1.4969}$ | $\num{1.588e-04}$ | $\num{3.990e-07}$ |
 :::
 
 ## Interacting Bose Gas
@@ -581,9 +581,9 @@ This section presents simulation results obtained using variational Monte Carlo 
 
 ### Parameter Grid Search using Metropolis Importance Sampling
 
-To estimate the ground-state energy for the interacting Bose gas, we performed grid search over $\alpha$ while keeping the anisotropy fixed at $\beta = \gamma = 2.82843$ and the characteristic length at $a = 0.0043$. Figure [](#figure:vmc-repulsive_grid-importance-analytic) shows that energy curves attain their minima for $\alpha < 1/2$. As the particles number increses, the optimal $\alpha$ shift to smaller values, and the corresponding per-particle energy rises. 
+To estimate the ground-state energy for the interacting Bose gas, we performed grid search over $\alpha$ while keeping the anisotropy fixed at $\beta = \gamma = 2.82843$ and the characteristic length at $a = 0.0043$. [](#figure:vmc-repulsive_grid-importance-analytic) shows that energy curves attain their minima for $\alpha < 1/2$. As the particles number increses, the optimal $\alpha$ shift to smaller values, and the corresponding per-particle energy rises. 
 
-A lower $\alpha$ indicates that the Gaussian factor in the the wavefunction [](#equation:trial-wavefunction) becomes broader, effictelvely producing a weaker confinement within the elliptic trap. This describes an expansion of the condensate due to repulsive interactions. The increase in total energy indicates that the interaction energy grows more rapidly than the reduction in kinetic energy gained from this expansion.
+A lower $\alpha$ indicates that the Gaussian factor in the wavefunction [](#equation:trial-wavefunction) becomes broader, effictelvely producing a weaker confinement within the elliptic trap. This describes an expansion of the condensate due to repulsive interactions. The increase in total energy indicates that the interaction energy grows more rapidly than the reduction in kinetic energy gained from this expansion.
 
 ```{figure} figures/vmc_bose_repulsive_grid_importance_analytic.pdf
 :label: figure:vmc-repulsive_grid-importance-analytic
@@ -605,10 +605,24 @@ In contrast to the non-interacting case, the optimized values of $\alpha$ decrea
 
 | $N$ | $\alpha$ | $\braket{E}/N$ | $\operatorname{var}(E)/N$ | $\operatorname{bias}(E)/N$ |
 |---|---|---|---|---|
-| 10 | 0.4937 | 2.4330 | 2.596e-04 | 6.281e-06 |
-| 100 | 0.4530 | 2.6871 | 2.051e-04 | -5.600e-06 |
-| 500 | 0.3676 | 3.5641 | 1.667e-04 | 1.105e-05 |
+| $\num{10}$ | $\num{0.4937}$ | $\num{2.4330}$ | $\num{2.596e-04}$ | $\num{6.281e-06}$ |
+| $\num{100}$  | $\num{0.4530}$ | $\num{2.6871}$ | $\num{2.051e-04}$ | $\num{-5.600e-06}$ |
+| $\num{500}$  | $\num{0.3676}$ | $\num{3.5641}$ | $\num{1.667e-04}$ | $\num{1.105e-05}$ |
 :::
+
+### One-body Densities
+
+Having optimized the Gaussian confinement parameter $\alpha$, we estimated the corresponding one-body densities for both the non-interacting harmonic oscillator and the repulsively interacting bose gas. [](#figure:vmc-onebody-density) shows how repulsive Jastrow correlations shape the one-body densities as the particle number $N$ increases. For $N = 10$, the interacting density has a sharper peak near the origin compared with the harmonic oscillator. This reflects the dominance of the external confinement over the repulsive interactions. At $N = 100$, the repulsive interactions become strong enough to counterbalance the trap, producing a density profile that more closely resembles the non-interacting system. For $N = 500$, the interacting distribution flatten and develops a longer tail. This reflects a regime in which the interaction energy is sufficiently large to expand the gas outward and reduce the influence of the elliptical trap. 
+
+On a sidenote, the one-body density for $N = 500$ is noticeably more noisy. This indicates that number Monte Carlo cycles used in the simulation lies near the lower threshold required for reliable sampling at large $N$. As the particle number grows, the configuration space becomes higher-dimensional and the repulsive correlations slow down the exploration of that space. Consequently, more cycles are needed to reduce autocorrelation and achieve smooth, well-converged density estimates.
+
+```{figure} figures/vmc_bose_onebody_density.pdf
+:label: figure:vmc-onebody-density
+:alt: vmc-onebody-density
+:align: center
+
+Normalized one-body densities as a function of radial coordinate $r$ of both the non-interacting harmonic oscillator and the repulsively interacting bose gas, shown for several particle numbers $N$. All densities are estimated using Metropolis importance sampling with $\num{1e6}$ cycles.
+```
 
 # Conclusions
 
@@ -948,7 +962,7 @@ $$
 The one-body function $\phi(\mathbf{r}) = A \exp(-\alpha r^2)$ must satisfy
 
 $$
-  \int_{\R^3} |\phi(\mathbf{r})|^2 \;\drm\mathbf{r} = |A|^2 \int_{\R^3} e^{-2\alpha r^2} \;\d\mathbf{r} = 1
+  \int_{\R^3} |\phi(\mathbf{r})|^2 \;\drm\mathbf{r} = |A|^2 \int_{\R^3} e^{-2\alpha r^2} \;\drm\mathbf{r} = 1
 $$
 
 Using
@@ -957,7 +971,7 @@ $$
   \int_{\R^3} e^{-2\alpha r^2} \;\drm\mathbf{r} = \left(\frac{\pi}{2\alpha} \right)^{3/2},
 $$
 
-we obtain the the normalization constant
+we obtain the normalization constant
 
 $$
   |A|^2 = \left(\frac{2\alpha}{\pi}\right)^{3/2}.
